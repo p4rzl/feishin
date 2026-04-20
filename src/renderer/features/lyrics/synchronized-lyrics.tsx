@@ -89,6 +89,14 @@ export const SynchronizedLyrics = ({
     const containerRef = useRef<HTMLDivElement | null>(null);
     const programmaticScrollRef = useRef(false);
 
+    // Word-by-word timers
+    const wordTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+    const clearWordTimers = () => {
+        wordTimers.current.forEach(clearTimeout);
+        wordTimers.current = [];
+    };
+
     const getCurrentLyric = (timeInMs: number) => {
         if (lyricRef.current) {
             const activeLyrics = lyricRef.current;
@@ -130,6 +138,14 @@ export const SynchronizedLyrics = ({
                 index = targetIndex;
             }
 
+            // Clear word timers from previous line
+            clearWordTimers();
+
+            // Reset all word highlights
+            document
+                .querySelectorAll('.synchronized-lyrics .word-active')
+                .forEach((node) => node.classList.remove('word-active'));
+
             // Directly modify the dom instead of using react to prevent rerender
             document
                 .querySelectorAll('.synchronized-lyrics .active')
@@ -153,6 +169,31 @@ export const SynchronizedLyrics = ({
             }
 
             currentLyric.classList.add('active');
+
+            // Word-by-word highlighting
+            if (index < lyricRef.current!.length - 1) {
+                const nextTime = lyricRef.current![index + 1][0];
+                const lineDuration = nextTime - timeInMs;
+                const wordElements = currentLyric.querySelectorAll('.lyric-word');
+
+                if (wordElements.length > 0 && lineDuration > 0) {
+                    const wordInterval = lineDuration / (wordElements.length + 1);
+                    wordElements.forEach((wordEl, wordIdx) => {
+                        const delay = wordIdx * wordInterval;
+                        const timer = setTimeout(() => {
+                            wordEl.classList.add('word-active');
+                        }, delay);
+                        wordTimers.current.push(timer);
+                    });
+                } else if (wordElements.length > 0) {
+                    // Last line or no next time — activate all words immediately
+                    wordElements.forEach((wordEl) => wordEl.classList.add('word-active'));
+                }
+            } else {
+                // Last lyric line — activate all words immediately
+                const wordElements = currentLyric.querySelectorAll('.lyric-word');
+                wordElements.forEach((wordEl) => wordEl.classList.add('word-active'));
+            }
 
             if (followRef.current && !userScrollingRef.current) {
                 programmaticScrollRef.current = true;
@@ -253,6 +294,7 @@ export const SynchronizedLyrics = ({
             clearTimeout(lyricTimer.current);
         }
 
+        clearWordTimers();
         timerEpoch.current += 1;
     }, []);
 
@@ -342,6 +384,7 @@ export const SynchronizedLyrics = ({
                         text +
                         (translatedLyrics ? `_BREAK_${translatedLyrics.split('\n')[idx]}` : '')
                     }
+                    wordByWord={!translatedLyrics}
                 />
             ))}
         </div>

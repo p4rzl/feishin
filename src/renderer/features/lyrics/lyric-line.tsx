@@ -10,10 +10,11 @@ interface LyricLineProps extends ComponentPropsWithoutRef<'div'> {
     alignment: 'center' | 'left' | 'right';
     fontSize: number;
     text: string;
+    wordByWord?: boolean;
 }
 
 export const LyricLine = memo(
-    ({ alignment, className, fontSize, text, ...props }: LyricLineProps) => {
+    ({ alignment, className, fontSize, text, wordByWord, ...props }: LyricLineProps) => {
         const lines = useMemo(() => text.split('_BREAK_'), [text]);
 
         const style = useMemo(
@@ -27,9 +28,26 @@ export const LyricLine = memo(
         return (
             <Box className={clsx(styles.lyricLine, className)} style={style} {...props}>
                 <Stack gap={0}>
-                    {lines.map((line, index) => (
-                        <span key={index}>{line}</span>
-                    ))}
+                    {lines.map((line, index) =>
+                        wordByWord ? (
+                            <span key={index}>
+                                {line.split(' ').map((word, wordIdx) =>
+                                    word ? (
+                                        <span
+                                            className={styles.lyricWord}
+                                            key={wordIdx}
+                                        >
+                                            {word}{' '}
+                                        </span>
+                                    ) : (
+                                        ' '
+                                    ),
+                                )}
+                            </span>
+                        ) : (
+                            <span key={index}>{line}</span>
+                        ),
+                    )}
                 </Stack>
             </Box>
         );

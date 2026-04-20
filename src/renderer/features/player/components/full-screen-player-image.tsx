@@ -263,25 +263,42 @@ export const FullScreenPlayerImage = () => {
                     )}
                 </AnimatePresence>
             </div>
-            <Stack className={styles.metadataContainer} gap="md" maw="100%">
-                <Text fw={900} lh="1.2" overflow="hidden" size="4xl" w="100%">
+            <Stack className={styles.metadataContainer} gap="sm" maw="100%">
+                <Text
+                    fw={900}
+                    lh="1.15"
+                    overflow="hidden"
+                    size="4xl"
+                    style={{
+                        letterSpacing: '-0.02em',
+                        textShadow: '0 2px 12px rgb(0 0 0 / 30%)',
+                    }}
+                    w="100%"
+                >
                     {isPlayingRadio
                         ? radioMetadata?.title || stationName || 'Radio'
                         : currentSong?.name}
                 </Text>
-                <Text key="fs-artists" size="xl">
+                <Text
+                    fw={500}
+                    key="fs-artists"
+                    opacity={0.85}
+                    size="xl"
+                    style={{ letterSpacing: '0.01em' }}
+                >
                     {isPlayingRadio
                         ? radioMetadata?.artist || stationName || 'Radio'
                         : currentSong?.artists?.map((artist, index) => (
                               <Fragment key={`fs-artist-${artist.id}`}>
                                   {index > 0 && (
                                       <Text
+                                          opacity={0.6}
                                           style={{
                                               display: 'inline-block',
                                               padding: '0 0.5rem',
                                           }}
                                       >
-                                          •
+                                          ·
                                       </Text>
                                   )}
                                   <Text
@@ -297,15 +314,17 @@ export const FullScreenPlayerImage = () => {
                           ))}
                 </Text>
                 {isPlayingRadio ? (
-                    <Text overflow="hidden" size="xl" w="100%">
+                    <Text opacity={0.65} overflow="hidden" size="lg" w="100%">
                         {stationName || 'Radio'}
                     </Text>
                 ) : (
                     <Text
                         component={Link}
+                        fw={400}
                         isLink
+                        opacity={0.65}
                         overflow="hidden"
-                        size="xl"
+                        size="lg"
                         to={generatePath(AppRoute.LIBRARY_ALBUMS_DETAIL, {
                             albumId: currentSong?.albumId || '',
                         })}
@@ -315,7 +334,7 @@ export const FullScreenPlayerImage = () => {
                     </Text>
                 )}
                 {!isPlayingRadio && (
-                    <Group justify="center" mt="sm">
+                    <Group justify="center" mt="xs">
                         {playerItems.map((i) => !i.disabled && builtDataItems[i.id])}
                     </Group>
                 )}

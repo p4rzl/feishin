@@ -23,6 +23,7 @@ import '/@/shared/styles/global.css';
 import { PlayerProvider } from '/@/renderer/features/player/context/player-context';
 import { AudioPlayers } from '/@/renderer/features/player/components/audio-players';
 import { ReleaseNotesModal } from '/@/renderer/release-notes-modal';
+import { useAuthStore } from '/@/renderer/store';
 
 const UpdateAvailableDialog = lazy(() =>
     import('./update-available-dialog').then((module) => ({
@@ -73,7 +74,7 @@ const AppShell = memo(function AppShell() {
             />
             <WebAudioContext.Provider value={webAudioProvider}>
                 <PlayerProvider>
-                    <AudioPlayers />
+                    <AuthenticatedAudioPlayers />
                     <AppRouter />
                 </PlayerProvider>
             </WebAudioContext.Provider>
@@ -84,6 +85,12 @@ const AppShell = memo(function AppShell() {
         </>
     );
 });
+
+const AuthenticatedAudioPlayers = () => {
+    const isAuthenticated = useAuthStore((state) => !!state.currentServer);
+    if (!isAuthenticated) return null;
+    return <AudioPlayers />;
+};
 
 const AppEffects = () => (
     <>
