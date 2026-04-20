@@ -31,18 +31,14 @@ export const LyricLine = memo(
                     {lines.map((line, index) =>
                         wordByWord ? (
                             <span key={index}>
-                                {line.split(' ').map((word, wordIdx) =>
-                                    word ? (
-                                        <span
-                                            className={styles.lyricWord}
-                                            key={wordIdx}
-                                        >
-                                            {word}{' '}
-                                        </span>
-                                    ) : (
-                                        ' '
-                                    ),
-                                )}
+                                {line.split(' ').filter((w) => w.length > 0).map((word, wordIdx) => (
+                                    <span
+                                        className={styles.lyricWord}
+                                        key={`${index}-${wordIdx}`}
+                                    >
+                                        {word}{' '}
+                                    </span>
+                                ))}
                             </span>
                         ) : (
                             <span key={index}>{line}</span>

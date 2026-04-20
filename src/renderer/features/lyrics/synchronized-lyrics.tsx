@@ -177,7 +177,7 @@ export const SynchronizedLyrics = ({
                 const wordElements = currentLyric.querySelectorAll('.lyric-word');
 
                 if (wordElements.length > 0 && lineDuration > 0) {
-                    const wordInterval = lineDuration / (wordElements.length + 1);
+                    const wordInterval = lineDuration / wordElements.length;
                     wordElements.forEach((wordEl, wordIdx) => {
                         const delay = wordIdx * wordInterval;
                         const timer = setTimeout(() => {
