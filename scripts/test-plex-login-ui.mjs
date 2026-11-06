@@ -5,13 +5,14 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const profile = mkdtempSync('/tmp/opencode/feishin-plex-ui-');
+const profile = mkdtempSync(path.join(tmpdir(), 'feishin-plex-ui-'));
 const web = process.argv.includes('--web');
 const timeoutTest = process.argv.includes('--timeout');
 const proxyTest = process.argv.includes('--proxy');

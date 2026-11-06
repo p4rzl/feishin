@@ -1,16 +1,16 @@
 services:
     feishin:
         container_name: feishin
-        image: "ghcr.io/jeffvli/feishin:latest"
+        image: 'ghcr.io/p4rzl/feishin:${FEISHIN_TAG:-development}'
         restart: unless-stopped
         environment:
-            - SERVER_NAME=jellyfin # pre-defined server name
-            - SERVER_LOCK=false # When true AND name/type/url are set, only username/password can be toggled
-            - SERVER_TYPE=jellyfin # the allowed types are: jellyfin, navidrome, subsonic. These values are case insensitive
-            - SERVER_URL=http://localhost:8096 # http://address:port or https://address:port
-            # - REMOTE_URL=http://share.localhost # Used for compatibility with external functionality, such as custom sharing URLs on Navidrome
-            - LEGACY_AUTHENTICATION=false # When SERVER_LOCK is true, sets the legacyauth flag for server authentication (true or false)
-            - ANALYTICS_DISABLED=true # Set to true to disable Umami analytics tracking
+            SERVER_NAME: 'Plex'
+            SERVER_LOCK: 'true'
+            SERVER_TYPE: 'plex'
+            SERVER_URL: '${FEISHIN_URL:?Set FEISHIN_URL in .env to the browser-visible Feishin origin}/plex'
+            PLEX_PROXY_URL: '${PLEX_URL:?Set PLEX_URL in .env to the container-reachable Plex origin}'
+            REMOTE_URL: ''
+            ANALYTICS_DISABLED: 'true'
+            FS_PLAYBACK_SCROBBLE_ENABLED: 'true'
         ports:
-            - 9180:9180
-            # Alternatively, to restrict to only localhost, - 127.0.0.1:9180:8190
+            - '${FEISHIN_PORT:-9180}:9180'

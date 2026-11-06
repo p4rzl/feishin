@@ -2,6 +2,7 @@ import { BrowserWindow, Menu, MenuItemConstructorOptions, shell } from 'electron
 
 import packageJson from '../../package.json';
 
+import { PROJECT_URL } from '/@/shared/constants/project';
 import { PlayerRepeat, PlayerStatus } from '/@/shared/types/types';
 
 export type MenuPlaybackState = {
@@ -309,27 +310,25 @@ export default class MenuBuilder {
             submenu: [
                 {
                     click() {
-                        shell.openExternal('https://github.com/jeffvli/feishin');
+                        shell.openExternal(PROJECT_URL);
                     },
                     label: 'Learn More',
                 },
                 {
                     click() {
-                        shell.openExternal(
-                            'https://github.com/jeffvli/feishin?tab=readme-ov-file#getting-started',
-                        );
+                        shell.openExternal(`${PROJECT_URL}?tab=readme-ov-file#getting-started`);
                     },
                     label: 'Documentation',
                 },
                 {
                     click() {
-                        shell.openExternal('https://github.com/jeffvli/feishin/discussions');
+                        shell.openExternal(`${PROJECT_URL}/discussions`);
                     },
                     label: 'Community Discussions',
                 },
                 {
                     click() {
-                        shell.openExternal('https://github.com/jeffvli/feishin/issues');
+                        shell.openExternal(`${PROJECT_URL}/issues`);
                     },
                     label: 'Search Issues',
                 },
@@ -426,27 +425,25 @@ export default class MenuBuilder {
                 submenu: [
                     {
                         click() {
-                            shell.openExternal('https://github.com/jeffvli/feishin');
+                            shell.openExternal(PROJECT_URL);
                         },
                         label: 'Learn More',
                     },
                     {
                         click() {
-                            shell.openExternal(
-                                'https://github.com/jeffvli/feishin?tab=readme-ov-file#getting-started',
-                            );
+                            shell.openExternal(`${PROJECT_URL}?tab=readme-ov-file#getting-started`);
                         },
                         label: 'Documentation',
                     },
                     {
                         click() {
-                            shell.openExternal('https://github.com/jeffvli/feishin/discussions');
+                            shell.openExternal(`${PROJECT_URL}/discussions`);
                         },
                         label: 'Community Discussions',
                     },
                     {
                         click() {
-                            shell.openExternal('https://github.com/jeffvli/feishin/issues');
+                            shell.openExternal(`${PROJECT_URL}/issues`);
                         },
                         label: 'Search Issues',
                     },

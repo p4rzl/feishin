@@ -2,31 +2,24 @@
 
 # Feishin
 
+This is [p4rzl's independently maintained fork](https://github.com/p4rzl/feishin) of [Feishin](https://github.com/jeffvli/feishin), with Plex support, listening activity reporting and an optional Docker CORS proxy. Plex support is maintained here, not by the upstream developers. Report fork-specific issues in [this repository](https://github.com/p4rzl/feishin/issues).
+
+`development` is the integration branch. See [fork maintenance](docs/FORK.md) and [Plex setup](docs/PLEX.md).
+
   <p align="center">
-    <a href="https://github.com/jeffvli/feishin/blob/main/LICENSE">
-      <img src="https://img.shields.io/github/license/jeffvli/feishin?style=flat-square&color=brightgreen"
+    <a href="https://github.com/p4rzl/feishin/blob/development/LICENSE">
+      <img src="https://img.shields.io/github/license/p4rzl/feishin?style=flat-square&color=brightgreen"
       alt="License">
     </a>
-      <a href="https://github.com/jeffvli/feishin/releases">
-      <img src="https://img.shields.io/github/v/release/jeffvli/feishin?style=flat-square&color=blue"
+      <a href="https://github.com/p4rzl/feishin/releases">
+      <img src="https://img.shields.io/github/v/release/p4rzl/feishin?style=flat-square&color=blue"
       alt="Release">
     </a>
-    <a href="https://github.com/jeffvli/feishin/releases">
-      <img src="https://img.shields.io/github/downloads/jeffvli/feishin/total?style=flat-square&color=orange"
+    <a href="https://github.com/p4rzl/feishin/releases">
+      <img src="https://img.shields.io/github/downloads/p4rzl/feishin/total?style=flat-square&color=orange"
       alt="Downloads">
     </a>
   </p>
-  <p align="center">
-    <a href="https://discord.gg/FVKpcMDy5f">
-      <img src="https://img.shields.io/discord/922656312888811530?color=black&label=discord&logo=discord&logoColor=white"
-      alt="Discord">
-    </a>
-    <a href="https://matrix.to/#/#sonixd:matrix.org">
-      <img src="https://img.shields.io/matrix/sonixd:matrix.org?color=black&label=matrix&logo=matrix&logoColor=white"
-      alt="Matrix">
-    </a>
-  </p>
-
 ---
 
 Rewrite of [Sonixd](https://github.com/jeffvli/sonixd).
@@ -39,7 +32,8 @@ Rewrite of [Sonixd](https://github.com/jeffvli/sonixd).
 - [x] Scrobble playback to your server
 - [x] Smart playlist editor (Navidrome)
 - [x] Synchronized and unsynchronized lyrics support
-- [ ] [Request a feature](https://github.com/jeffvli/feishin/issues) or [view taskboard](https://github.com/users/jeffvli/projects/5/views/1)
+- [x] Plex browser sign-in, music libraries, playlists and listening activity
+- [ ] [Request a feature](https://github.com/p4rzl/feishin/issues)
 
 ## Screenshots
 
@@ -49,7 +43,7 @@ Rewrite of [Sonixd](https://github.com/jeffvli/sonixd).
 
 ### Desktop (recommended)
 
-Download the [latest desktop client](https://github.com/jeffvli/feishin/releases). The desktop client is the recommended way to use Feishin. It supports both the MPV and web player backends, as well as includes built-in fetching for lyrics.
+Desktop builds from this fork are published in [GitHub Releases](https://github.com/p4rzl/feishin/releases). Until a desktop release is available, build locally with `pnpm package:linux:pr`, `pnpm package:mac:pr` or `pnpm package:win:pr`. The desktop client supports both the MPV and web player backends, as well as built-in fetching for lyrics.
 
 #### macOS Notes
 
@@ -59,7 +53,7 @@ For media keys to work, you will be prompted to allow Feishin to be a Trusted Ac
 
 #### Linux Notes
 
-Feishin is available in [Flathub](https://flathub.org/en/apps/org.jeffvli.feishin).
+The original Feishin is available in [Flathub](https://flathub.org/en/apps/org.jeffvli.feishin). That package is maintained upstream and does not include this fork's Plex changes.
 
 Alternatively, you can install it as an Appimage. We provide a small install script to download the latest `.AppImage`, make it executable, and also download the icons required by Desktop Environments. Finally, it generates a `.desktop` file to add Feishin to your Application Launcher.
 
@@ -67,34 +61,34 @@ Simply run the installer like this:
 
 ```sh
 dir=/your/application/directory
-curl 'https://raw.githubusercontent.com/jeffvli/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir"
+curl 'https://raw.githubusercontent.com/p4rzl/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir"
 ```
 
 The script also has an option to add launch arguments to run Feishin in native Wayland mode. Note that this is experimental in Electron and therefore not officially supported. If you want to use it, run this instead:
 
 ```sh
 dir=/your/application/directory
-curl 'https://raw.githubusercontent.com/jeffvli/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir" wayland-native
+curl 'https://raw.githubusercontent.com/p4rzl/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir" wayland-native
 ```
 
 It also provides a simple uninstall routine, removing the downloaded files:
 
 ```sh
 dir=/your/application/directory
-curl 'https://raw.githubusercontent.com/jeffvli/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir" remove
+curl 'https://raw.githubusercontent.com/p4rzl/feishin/refs/heads/development/install-feishin-appimage' | sh -s -- "$dir" remove
 ```
 
 The entry should show up in your Application Launcher immediately. If it does not, simply log out, wait 10 seconds, and log back in. Your Desktop Environment may alternatively provide a way to reload entries.
 
 ### Web and Docker
 
-Visit [https://feishin.vercel.app](https://feishin.vercel.app) to use the hosted web version of Feishin. The web client only supports the web player backend.
+Self-host this fork's web client using Docker. The upstream hosted client at [feishin.vercel.app](https://feishin.vercel.app) does not include this fork's Plex changes. The web client only supports the web player backend.
 
-Feishin is also available as a Docker image. The images are hosted via `ghcr.io` and are available to view [here](https://github.com/jeffvli/feishin/pkgs/container/feishin). You can run the container using the following commands:
+Fork images are published to [GHCR](https://github.com/p4rzl/feishin/pkgs/container/feishin). Every push to `development` builds the `development` tag and the compatibility alias `plex` for AMD64 and ARM64.
 
 ```bash
-# Run the latest version
-docker run --name feishin -p 9180:9180 ghcr.io/jeffvli/feishin:latest
+# Run the development version
+docker run --name feishin -p 9180:9180 ghcr.io/p4rzl/feishin:development
 
 # Build the image locally
 docker build -t feishin .
@@ -103,26 +97,19 @@ docker run --name feishin -p 9180:9180 feishin
 
 #### Docker Compose
 
-To install via Docker Compose, use the following snippet. This also works on Portainer.
+The included Compose file configures Plex through the same-origin proxy, avoiding browser CORS restrictions. Set both URLs before starting:
 
-```yaml
-services:
-    feishin:
-        container_name: feishin
-        image: 'ghcr.io/jeffvli/feishin:latest'
-        restart: unless-stopped
-        environment:
-            - SERVER_NAME=jellyfin # pre-defined server name
-            - SERVER_LOCK=true # When true AND name/type/url are set, only username/password can be toggled
-            - SERVER_TYPE=jellyfin # the allowed types are: jellyfin, navidrome, subsonic. These values are case insensitive
-            - SERVER_URL= # http://address:port or https://address:port
-            - REMOTE_URL= # http://address or https://address
-            - LEGACY_AUTHENTICATION=false # When SERVER_LOCK is true, sets the legacy (plaintext) authentication flag for Subsonic/OpenSubsonic servers
-            - ANALYTICS_DISABLED=true # Set to true to disable Umami analytics tracking
-        ports:
-            - 9180:9180
-            # Alternatively, to restrict to only localhost, - 127.0.0.1:9180:8190
+```bash
+cp .env.example .env
+# Edit .env: FEISHIN_URL is the browser-visible site origin;
+# PLEX_URL is the Plex origin reachable from the container.
+docker compose pull
+docker compose up -d
 ```
+
+For example, use `FEISHIN_URL=http://192.168.1.150:9180` and `PLEX_URL=http://192.168.1.150:32400`. Use your HTTPS site origin for remote browser access. Do not include a trailing slash in `FEISHIN_URL`.
+
+For Portainer, import `docker-compose.yaml` and provide those environment variables in the stack configuration. See [Plex setup and security requirements](docs/PLEX.md). Jellyfin, Navidrome and Subsonic remain supported through the normal server configuration, without the Plex proxy.
 
 ### Configuration
 
@@ -139,7 +126,7 @@ services:
 
 5. _Optional_ - If your server uses a separate public-facing URL than what integrating applications use internally to communicate with your server, such as a separate Navidrome `ShareURL`, set `REMOTE_URL` to said public-facing URL.
 
-6. _Optional_ - To disable Umami analytics tracking in the Docker/web version, set the environment variable `ANALYTICS_DISABLED=true`. When enabled, the analytics script will not be loaded and all tracking will be disabled.
+6. This fork does not load upstream analytics. `ANALYTICS_DISABLED` remains accepted for compatibility with existing deployments.
 
 7. _Optional_ - App settings (theme, language, sidebar options, etc.) can be overridden with environment variables on first run. The variables use the `FS_` prefix (e.g. `FS_GENERAL_THEME=defaultDark`, `FS_GENERAL_LANGUAGE=de`). See [the settings environment variable documentation](docs/ENV_SETTINGS.md) for the full list.
 
@@ -187,7 +174,7 @@ On the desktop app, you can add custom themes by dropping JSON files into the Th
 
 ## Development
 
-Built and tested using Node `v23.11.0`.
+Use Node 24 LTS and the pnpm version pinned in `package.json`. Typechecking runs in CI; run the Plex regression checks locally with `pnpm test:plex` and `pnpm test:plex:proxy` (requires nginx).
 
 This project is built off of [electron-vite](https://github.com/alex8088/electron-vite)
 
@@ -220,8 +207,8 @@ This project is built off of [electron-vite](https://github.com/alex8088/electro
 
 ## Translation
 
-This project uses [Weblate](https://hosted.weblate.org/projects/feishin/) for translations. If you would like to contribute, please visit the link and submit a translation.
+Upstream translations are maintained on [Weblate](https://hosted.weblate.org/projects/feishin/). Submit translations for fork-specific features through this repository.
 
 ## License
 
-[GNU General Public License v3.0 ©](https://github.com/jeffvli/feishin/blob/dev/LICENSE)
+[GNU General Public License v3.0](LICENSE). Original Feishin and contributor copyrights are preserved.

@@ -9,6 +9,7 @@ import { Switch } from '/@/shared/components/switch/switch';
 
 export const AnalyticsSettings = memo(() => {
     const { t } = useTranslation();
+    if (!window.umami) return null;
 
     const handleSetSendAnalytics = (send: boolean) => {
         if (send) {

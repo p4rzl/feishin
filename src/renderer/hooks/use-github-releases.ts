@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
-export const GITHUB_RELEASES_URL = 'https://api.github.com/repos/jeffvli/feishin/releases';
+import { PROJECT_API_URL } from '/@/shared/constants/project';
+
+export const GITHUB_RELEASES_URL = `${PROJECT_API_URL}/releases`;
 export const RELEASES_TO_FETCH = 30;
 
 export interface GitHubRelease {

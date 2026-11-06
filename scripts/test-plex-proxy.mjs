@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const profile = mkdtempSync('/tmp/opencode/feishin-plex-proxy-');
+const profile = mkdtempSync(path.join(tmpdir(), 'feishin-plex-proxy-'));
 const template = readFileSync(new URL('../ng.conf.template', import.meta.url), 'utf8');
 const requests = [];
 const upstream = createServer(async (request, response) => {

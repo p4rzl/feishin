@@ -42,25 +42,16 @@ import {
     DEFAULT_WINDOW_BOUNDS,
     resolveWindowBounds,
 } from '/@/main/utils/window-bounds';
+import { PROJECT_GITHUB_OWNER, PROJECT_GITHUB_REPO } from '/@/shared/constants/project';
 import { PlayerRepeat, PlayerStatus, PlayerType, TitleTheme } from '/@/shared/types/types';
 
-const ALPHA_UPDATER_CONFIG: {
-    bucket: string;
-    channel: string;
-    endpoint: string;
-    provider: 's3';
-} = {
-    bucket: '',
-    channel: 'alpha',
-    endpoint: 'https://feishin-nightly-bucket.jeffvli.org',
-    provider: 's3',
+const GITHUB_UPDATER_CONFIG = {
+    owner: PROJECT_GITHUB_OWNER,
+    provider: 'github' as const,
+    repo: PROJECT_GITHUB_REPO,
 };
 
-const GITHUB_UPDATER_CONFIG = {
-    owner: 'jeffvli',
-    provider: 'github' as const,
-    repo: 'feishin',
-};
+const ALPHA_UPDATER_CONFIG = { ...GITHUB_UPDATER_CONFIG, channel: 'alpha' };
 
 type UpdaterInstance = AppImageUpdater | MacUpdater | NsisUpdater | typeof autoUpdater;
 
@@ -1203,7 +1194,7 @@ if (!singleInstance) {
                     responseHeaders: {
                         ...details.responseHeaders,
                         'Content-Security-Policy': [
-                            "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://umami.jeffvli.org; style-src 'self' 'unsafe-inline'; media-src 'self' http: https: data: blob:; img-src 'self' http: https: data: blob:; connect-src 'self' http: https: ws: wss:; default-src 'self';",
+                            "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' http: https: data: blob:; img-src 'self' http: https: data: blob:; connect-src 'self' http: https: ws: wss:; default-src 'self';",
                         ],
                     },
                 });

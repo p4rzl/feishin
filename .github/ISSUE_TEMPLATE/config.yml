@@ -1,11 +1,8 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
     - name: Questions or help
-      url: https://github.com/jeffvli/feishin/discussions
+      url: https://github.com/p4rzl/feishin/discussions
       about: Ask questions or get help in the discussions section
-    - name: Discord Community
-      url: https://discord.gg/FVKpcMDy5f
-      about: The discord/matrix servers are bridged so you can join whichever you prefer
-    - name: Matrix Community
-      url: https://matrix.to/#/#sonixd:matrix.org
-      about: The discord/matrix servers are bridged so you can join whichever you prefer
+    - name: Plex setup and limitations
+      url: https://github.com/p4rzl/feishin/blob/development/docs/PLEX.md
+      about: Connection, Docker proxy and supported Plex features

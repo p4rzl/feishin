@@ -6,12 +6,13 @@
         "subsonic",
         "navidrome",
         "jellyfin",
+        "plex",
         "react",
         "electron"
     ],
-    "homepage": "https://github.com/jeffvli/feishin",
+    "homepage": "https://github.com/p4rzl/feishin",
     "bugs": {
-        "url": "https://github.com/jeffvli/feishin/issues"
+        "url": "https://github.com/p4rzl/feishin/issues"
     },
     "license": "GPL-3.0",
     "author": {
@@ -65,6 +66,9 @@
         "publish:win-arm64:alpha": "pnpm run build && electron-builder --config electron-builder-alpha.yml --publish always --win --arm64",
         "publish:win-arm64:beta": "pnpm run build && electron-builder --config electron-builder-beta.yml --publish always --win --arm64",
         "start": "electron-vite preview",
+        "test:fork": "node scripts/test-fork.mjs",
+        "test:plex": "node scripts/test-plex.mjs && node scripts/test-plex-playback.mjs",
+        "test:plex:proxy": "node scripts/test-plex-proxy.mjs",
         "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
         "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
         "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
