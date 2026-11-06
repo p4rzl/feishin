@@ -100,8 +100,10 @@ const playlist = {
 };
 const calls = [];
 let failAppend = false;
+let failMove = false;
 let smart = false;
 let unauthorized = false;
+let playlistTracks = [track, { ...track, playlistItemID: '301' }];
 
 axios.defaults.adapter = async (config) => {
     calls.push(config);
@@ -140,8 +142,19 @@ axios.defaults.adapter = async (config) => {
     else if (path === '/playlists/9') container = { Metadata: [{ ...playlist, smart }] };
     else if (path === '/playlists') container = { Metadata: [playlist], size: 1 };
     else if (path === '/playlists/9/items' && config.method === 'get')
-        container = { Metadata: [track, { ...track, playlistItemID: '301' }], size: 2 };
-    else if (path === '/playlists/9/items' && config.method === 'put' && failAppend)
+        container = { Metadata: playlistTracks, size: playlistTracks.length };
+    else if (/^\/playlists\/9\/items\/[^/]+\/move$/.test(path) && config.method === 'put') {
+        if (failMove) throw new Error('Simulated move failure');
+        const id = path.split('/').at(-2);
+        const from = playlistTracks.findIndex((entry) => entry.playlistItemID === id);
+        assert.ok(from >= 0);
+        const [entry] = playlistTracks.splice(from, 1);
+        const after = config.params.after;
+        const index = after
+            ? playlistTracks.findIndex((item) => item.playlistItemID === after) + 1
+            : 0;
+        playlistTracks.splice(index, 0, entry);
+    } else if (path === '/playlists/9/items' && config.method === 'put' && failAppend)
         throw new Error('Simulated network failure');
     else if (path === '/library/all' || path === '/library/sections/7/all') {
         const start = config.params['X-Plex-Container-Start'];
@@ -243,6 +256,8 @@ const direct = new URL(
 );
 assert.equal(direct.pathname, '/proxy/library/parts/30/file.flac');
 assert.equal(direct.searchParams.get('X-Plex-Token'), server.credential);
+assert.equal(direct.searchParams.get('X-Plex-Client-Identifier'), 'test-device');
+assert.equal(direct.searchParams.get('X-Plex-Product'), 'Feishin');
 const remote = new URL(
     await api.getStreamUrl({
         apiClientProps: { ...apiClientProps, forceRemoteUrl: true },
@@ -256,6 +271,7 @@ const transcode = new URL(
 );
 assert.equal(transcode.pathname, '/proxy/music/:/transcode/universal/start.mp3');
 assert.equal(transcode.searchParams.get('audioBitrate'), '128');
+assert.equal(transcode.searchParams.get('X-Plex-Client-Identifier'), 'test-device');
 assert.equal(
     new URL(await api.getDownloadUrl({ apiClientProps, query: { id: '3' } })).searchParams.get(
         'download',
@@ -321,12 +337,186 @@ const append = replacementCalls.findIndex((call) => call.method === 'put');
 assert.ok(append >= 0 && firstDelete > append);
 assert.equal(replacementCalls.filter((call) => call.method === 'delete').length, 2);
 
+playlistTracks = [
+    track,
+    { ...track, playlistItemID: '301', ratingKey: '4' },
+    { ...track, playlistItemID: '302' },
+];
+const reorderStart = calls.length;
+await api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['3', '3', '4'] } });
+assert.deepEqual(
+    playlistTracks.map((entry) => entry.playlistItemID),
+    ['300', '302', '301'],
+);
+let reorderWrites = calls.slice(reorderStart).filter((call) => call.method !== 'get');
+assert.equal(reorderWrites.length, 1);
+assert.equal(new URL(reorderWrites[0].url).pathname, '/proxy/playlists/9/items/302/move');
+assert.equal(reorderWrites[0].params.after, '300');
+const moveToStart = calls.length;
+await api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['4', '3', '3'] } });
+assert.deepEqual(
+    playlistTracks.map((entry) => entry.playlistItemID),
+    ['301', '300', '302'],
+);
+reorderWrites = calls.slice(moveToStart).filter((call) => call.method !== 'get');
+assert.equal(reorderWrites.length, 1);
+assert.equal(new URL(reorderWrites[0].url).pathname, '/proxy/playlists/9/items/301/move');
+assert.deepEqual(reorderWrites[0].params, {});
+const unchanged = calls.length;
+await api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['4', '3', '3'] } });
+assert.ok(!calls.slice(unchanged).some((call) => call.method !== 'get'));
+failMove = true;
+const failedReorder = calls.length;
+await assert.rejects(
+    api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['3', '4', '3'] } }),
+    /Simulated move failure/,
+);
+assert.deepEqual(
+    playlistTracks.map((entry) => entry.playlistItemID),
+    ['301', '300', '302'],
+);
+assert.ok(
+    calls.slice(failedReorder).every((call) => call.method === 'get' || call.url.endsWith('/move')),
+    'A failed reorder must not fall back to appending or deleting tracks',
+);
+failMove = false;
+smart = true;
+const smartReorder = calls.length;
+await assert.rejects(
+    api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['3', '4', '3'] } }),
+    /regular Plex music playlists/,
+);
+assert.ok(!calls.slice(smartReorder).some((call) => call.method !== 'get'));
+smart = false;
+await assert.rejects(
+    api.movePlaylistItem({
+        apiClientProps,
+        query: { endingIndex: 0.5, playlistId: '9', trackId: '301' },
+    }),
+    /Invalid Plex playlist position/,
+);
+playlistTracks = [track, { ...track, playlistItemID: undefined }];
+const missingEntryId = calls.length;
+await assert.rejects(
+    api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['3', '3'] } }),
+    /Plex playlist entry ID is missing/,
+);
+await assert.rejects(
+    api.replacePlaylist({ apiClientProps, body: { songId: ['3'] }, query: { id: '9' } }),
+    /Plex playlist entry ID is missing/,
+);
+assert.ok(
+    !calls.slice(missingEntryId).some((call) => call.method !== 'get'),
+    'Missing occurrence IDs must be rejected before any replacement or reorder writes',
+);
+playlistTracks = [track, { ...track, playlistItemID: '301' }];
+const changedContents = calls.length;
+await api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: ['3'] } });
+assert.equal(calls.slice(changedContents).filter((call) => call.method === 'delete').length, 2);
+assert.ok(calls.slice(changedContents).some((call) => call.method === 'put' && call.params.uri));
+const cleared = calls.length;
+await api.setPlaylistSongs({ apiClientProps, body: { id: '9', songIds: [] } });
+assert.equal(calls.slice(cleared).filter((call) => call.method === 'delete').length, 2);
+assert.ok(!calls.slice(cleared).some((call) => call.method === 'put'));
+
 await api.scrobble({
     apiClientProps,
     query: { id: '3', mediaType: 'song', playbackRate: 1, submission: true },
 });
 assert.equal(new URL(calls.at(-1).url).pathname, '/proxy/:/scrobble');
 assert.equal(calls.at(-1).params.key, '3');
+const serverInfo = await api.getServerInfo({ apiClientProps });
+assert.deepEqual(serverInfo.features.reportPlayback, [1]);
+for (const [event, state] of [
+    ['start', 'playing'],
+    ['timeupdate', 'playing'],
+    ['pause', 'paused'],
+    ['unpause', 'playing'],
+    ['stop', 'stopped'],
+]) {
+    const beforeTimeline = calls.length;
+    await api.scrobble({
+        apiClientProps,
+        query: {
+            duration: track.duration,
+            event,
+            id: '3',
+            mediaType: 'song',
+            playbackRate: 1,
+            position: 12345.6,
+            submission: false,
+        },
+    });
+    assert.equal(calls.length, beforeTimeline + 1, 'Timeline reports need no extra metadata fetch');
+    assert.equal(new URL(calls.at(-1).url).pathname, '/proxy/:/timeline');
+    assert.equal(calls.at(-1).method, 'get');
+    assert.deepEqual(calls.at(-1).params, {
+        duration: track.duration,
+        identifier: 'com.plexapp.plugins.library',
+        key: '/library/metadata/3',
+        ratingKey: '3',
+        state,
+        time: 12346,
+    });
+}
+const noEvent = calls.length;
+await api.scrobble({
+    apiClientProps,
+    query: { id: '3', mediaType: 'song', playbackRate: 1, submission: false },
+});
+assert.equal(calls.length, noEvent, 'An empty event must not create a playing session');
+await api.scrobble({
+    apiClientProps,
+    query: { event: 'start', id: '3', mediaType: 'song', playbackRate: 1, submission: false },
+});
+assert.equal(calls.at(-1).params.duration, track.duration);
+assert.equal(calls.at(-1).params.time, 0);
+for (const values of [
+    { duration: -1, position: 0 },
+    { duration: track.duration, position: NaN },
+    { duration: Infinity, position: 0 },
+    { duration: track.duration, position: -1 },
+]) {
+    const invalidReport = calls.length;
+    await assert.rejects(
+        api.scrobble({
+            apiClientProps,
+            query: {
+                ...values,
+                event: 'timeupdate',
+                id: '3',
+                mediaType: 'song',
+                playbackRate: 1,
+                submission: false,
+            },
+        }),
+        /Invalid Plex playback position or duration/,
+    );
+    assert.equal(calls.length, invalidReport, 'Invalid timing must not be sent to Plex');
+}
+const submission = calls.length;
+await api.scrobble({
+    apiClientProps,
+    query: { event: 'stop', id: '3', mediaType: 'song', playbackRate: 1, submission: true },
+});
+assert.equal(calls.length, submission + 1);
+assert.equal(new URL(calls.at(-1).url).pathname, '/proxy/:/scrobble');
+unauthorized = true;
+await assert.rejects(
+    api.scrobble({
+        apiClientProps,
+        query: {
+            duration: track.duration,
+            event: 'start',
+            id: '3',
+            mediaType: 'song',
+            playbackRate: 1,
+            submission: false,
+        },
+    }),
+    { status: 401 },
+);
+unauthorized = false;
 await assert.rejects(
     api.setRating({ apiClientProps, query: { id: ['3'], rating: 99, type: 'song' } }),
 );
@@ -346,6 +536,7 @@ let localAvailable = true;
 let remoteAvailable = true;
 let musicAvailable = true;
 let wrongIdentity = false;
+let identityXml = false;
 const discoveredResources = [
     {
         accessToken: 'server-scoped-token',
@@ -425,6 +616,8 @@ axios.defaults.adapter = async (config) => {
                           : 'machine-1',
                 },
             };
+            if (identityXml)
+                data = `<?xml version="1.0" encoding="UTF-8"?><MediaContainer size="0" claimed="1" machineIdentifier="${data.MediaContainer.machineIdentifier}" version="1.40.0"/>`;
         } else {
             assert.ok(url.pathname.endsWith('/library/sections'));
             assert.notEqual(
@@ -502,6 +695,12 @@ assert.deepEqual(oauthResult, {
     userId: '42',
     username: 'Plex listener',
 });
+identityXml = true;
+assert.equal((await api.authenticate('', connectArgs)).url, 'http://192.168.1.25:32400');
+wrongIdentity = true;
+assert.equal((await api.authenticate('', connectArgs)).url, 'http://192.168.1.25:32400');
+wrongIdentity = false;
+identityXml = false;
 localAvailable = false;
 assert.equal((await api.authenticate('', connectArgs)).url, 'https://remote-plex.example/proxy');
 remoteAvailable = false;

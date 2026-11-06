@@ -207,13 +207,14 @@ const replacePlaylist: InternalControllerEndpoint['replacePlaylist'] = async ({
             throw new Error('Invalid Plex track');
     }
     const previous = await playlistItems(apiClientProps, query.id);
+    if (previous.some((item) => !item.playlistItemID))
+        throw new Error('Plex playlist entry ID is missing');
     // Plex has no atomic replace. Append successfully before removing old entries to avoid data loss.
     await addToPlaylist({ apiClientProps, body, query });
     for (const item of previous) {
-        if (!item.playlistItemID) throw new Error('Plex playlist entry ID is missing');
         await plexMutation(
             apiClientProps,
-            `/playlists/${encodeURIComponent(query.id)}/items/${encodeURIComponent(item.playlistItemID)}`,
+            `/playlists/${encodeURIComponent(query.id)}/items/${encodeURIComponent(item.playlistItemID!)}`,
             {},
             'DELETE',
         );
@@ -227,7 +228,10 @@ const fileUrl = async (props: ClientProps, id: string, download = false) => {
     const base = getServerUrl(props.server, props.forceRemoteUrl);
     if (!part?.key || !base) throw new Error('Plex track has no playable media');
     const url = plexUrl(base, part.key);
-    url.searchParams.set('X-Plex-Token', requiredServer(props).credential);
+    // Media players cannot attach headers; use the same client identity as timeline reports.
+    for (const [key, value] of Object.entries(plexHeaders(requiredServer(props).credential))) {
+        if (key.startsWith('X-Plex-')) url.searchParams.set(key, value);
+    }
     if (download) url.searchParams.set('download', '1');
     return url.toString();
 };
@@ -506,7 +510,10 @@ export const PlexController: InternalControllerEndpoint = {
     getServerInfo: async ({ apiClientProps }) => {
         const result = await plexRequest(apiClientProps, '/');
         return {
-            features: { [ServerFeature.TOP_SONGS_BY_ARTIST_ID]: [1] },
+            features: {
+                [ServerFeature.REPORT_PLAYBACK]: [1],
+                [ServerFeature.TOP_SONGS_BY_ARTIST_ID]: [1],
+            },
             id: requiredServer(apiClientProps).id,
             version: result.version ?? '',
         };
@@ -560,7 +567,12 @@ export const PlexController: InternalControllerEndpoint = {
         await assertEditablePlaylist(apiClientProps, query.playlistId);
         const entries = await playlistItems(apiClientProps, query.playlistId);
         const from = entries.findIndex((entry) => entry.playlistItemID === query.trackId);
-        if (from < 0 || query.endingIndex < 0 || query.endingIndex >= entries.length)
+        if (
+            from < 0 ||
+            !Number.isInteger(query.endingIndex) ||
+            query.endingIndex < 0 ||
+            query.endingIndex >= entries.length
+        )
             throw new Error('Invalid Plex playlist position');
         const [entry] = entries.splice(from, 1);
         entries.splice(query.endingIndex, 0, entry);
@@ -593,13 +605,43 @@ export const PlexController: InternalControllerEndpoint = {
     replacePlaylist,
     savePlayQueue: unsupported,
     scrobble: async ({ apiClientProps, query }) => {
-        if (query.submission)
+        if (query.submission) {
             await plexMutation(
                 apiClientProps,
                 '/:/scrobble',
                 { identifier: 'com.plexapp.plugins.library', key: query.id },
                 'GET',
             );
+            return null;
+        }
+        if (!query.event) return null;
+        const duration = query.duration ?? (await metadata(apiClientProps, query.id)).duration ?? 0;
+        const position = query.position ?? 0;
+        if (
+            !Number.isFinite(duration) ||
+            duration < 0 ||
+            !Number.isFinite(position) ||
+            position < 0
+        )
+            throw new Error('Invalid Plex playback position or duration');
+        await plexMutation(
+            apiClientProps,
+            '/:/timeline',
+            {
+                duration: Math.round(duration),
+                identifier: 'com.plexapp.plugins.library',
+                key: `/library/metadata/${encodeURIComponent(query.id)}`,
+                ratingKey: query.id,
+                state:
+                    query.event === 'stop'
+                        ? 'stopped'
+                        : query.event === 'pause'
+                          ? 'paused'
+                          : 'playing',
+                time: Math.round(position),
+            },
+            'GET',
+        );
         return null;
     },
     search: async ({ apiClientProps, query }) => {
@@ -640,6 +682,34 @@ export const PlexController: InternalControllerEndpoint = {
         return { albumArtists: artists.items, albums: albums.items, songs: songs.items };
     },
     setPlaylistSongs: async ({ apiClientProps, body }) => {
+        await assertEditablePlaylist(apiClientProps, body.id);
+        const entries = await playlistItems(apiClientProps, body.id);
+        const remaining = [...entries];
+        // Match occurrences, not just track IDs: duplicates have distinct playlist entry IDs.
+        // ponytail: quadratic matching; index occurrences if very large playlist edits become slow.
+        const ordered = body.songIds.map((id) => {
+            const index = remaining.findIndex((entry) => entry.ratingKey === id);
+            return index < 0 ? undefined : remaining.splice(index, 1)[0];
+        });
+        if (!remaining.length && ordered.every((entry) => entry !== undefined)) {
+            if (entries.some((entry) => !entry.playlistItemID))
+                throw new Error('Plex playlist entry ID is missing');
+            // A pure reorder must not append/delete tracks or change their occurrence IDs.
+            for (const [index, entry] of ordered.entries()) {
+                const from = entries.findIndex(
+                    (item) => item.playlistItemID === entry!.playlistItemID,
+                );
+                if (from === index) continue;
+                const after = entries[index - 1]?.playlistItemID;
+                await plexMutation(
+                    apiClientProps,
+                    `/playlists/${encodeURIComponent(body.id)}/items/${encodeURIComponent(entry!.playlistItemID!)}/move`,
+                    after ? { after } : {},
+                );
+                entries.splice(index, 0, entries.splice(from, 1)[0]);
+            }
+            return null;
+        }
         await replacePlaylist({
             apiClientProps,
             body: { songId: body.songIds },
