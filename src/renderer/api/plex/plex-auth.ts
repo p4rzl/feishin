@@ -79,7 +79,6 @@ const connectServer = async (
                 ...(signal ? [signal] : []),
                 AbortSignal.timeout(5000),
             ]);
-            if ((await getIdentity(url, probeSignal)) !== resource.id) continue;
             const server: ServerListItemWithCredential = {
                 credential: resource.credential,
                 id: '',
@@ -89,10 +88,25 @@ const connectServer = async (
                 userId: body.userId,
                 username: body.username,
             };
+            // Unauthenticated /identity returns Access-Control-Allow-Origin: https://app.plex.tv on
+            // real Plex servers, which browsers block via CORS. On *.plex.direct (already bound to
+            // the server's Plex TLS certificate), verify via authenticated endpoints directly.
+            const isPlexDirect = new URL(url).hostname.endsWith('.plex.direct');
+            if (!isPlexDirect) {
+                const id = await getIdentity(url, probeSignal).catch(async (err) => {
+                    if (url !== preferredUrl) throw err;
+                    return (await plexRequest({ server, signal: probeSignal }, '/'))
+                        .machineIdentifier;
+                });
+                if (id !== resource.id) continue;
+            }
             const libraries = await plexRequest(
                 { server, signal: probeSignal },
                 '/library/sections',
             );
+            if (libraries.machineIdentifier && libraries.machineIdentifier !== resource.id) {
+                continue;
+            }
             if (!libraries.Directory?.some((entry) => entry.type === 'artist')) {
                 noMusic = true;
                 continue;
@@ -175,7 +189,8 @@ export const authenticatePlex = async (url: string, body: Record<string, any>) =
         );
         // A configured URL or saved server ID restricts locked deployments and credential renewal.
         const machineId =
-            body.serverId || (url.trim() ? await getIdentity(url.trim(), signal) : undefined);
+            body.serverId ||
+            (url.trim() ? await getIdentity(url.trim(), signal).catch(() => undefined) : undefined);
         if (machineId)
             resources = resources.filter((entry) => entry.clientIdentifier === machineId);
         if (!resources.length)

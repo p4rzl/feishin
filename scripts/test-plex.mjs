@@ -944,6 +944,21 @@ assert.equal(
     'https://remote-plex.example/proxy',
 );
 assert.ok(oauthCalls.slice(httpsStart).every((call) => new URL(call.url).protocol === 'https:'));
+const plexDirectStart = oauthCalls.length;
+const plexDirectUrl = 'https://192-168-1-150.7658f68c61eb4930b7674ee452334e11.plex.direct:32400';
+const plexDirectConnected = await api.authenticate('', {
+    ...connectArgs,
+    httpsOnly: true,
+    server: {
+        ...connectArgs.server,
+        connections: [{ local: true, relay: false, url: plexDirectUrl }],
+    },
+});
+assert.equal(plexDirectConnected.url, plexDirectUrl);
+assert.ok(
+    !oauthCalls.slice(plexDirectStart).some((call) => new URL(call.url).pathname.endsWith('/identity')),
+    'Skip unauthenticated /identity on *.plex.direct because Plex returns app.plex.tv CORS on unauthenticated routes',
+);
 const shared = await api.authenticate('', { ...connectArgs, server: oauthAccount.servers[1] });
 assert.equal(shared.credential, 'shared-server-token');
 assert.equal(shared.plexServerId, 'machine-2');
