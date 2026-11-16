@@ -305,17 +305,29 @@ const AudioPlayersContent = ({
         const ctx = audioContext.context;
         if (ctx.state === 'running') return undefined;
 
-        const unlock = () => {
-            ctx.resume().catch(() => {});
-        };
-
-        document.addEventListener('pointerdown', unlock, { capture: true, once: true });
-        document.addEventListener('keydown', unlock, { capture: true, once: true });
-
-        return () => {
+        const cleanup = () => {
             document.removeEventListener('pointerdown', unlock, { capture: true });
             document.removeEventListener('keydown', unlock, { capture: true });
+            ctx.removeEventListener('statechange', onStateChange);
         };
+
+        const onStateChange = () => {
+            if (ctx.state === 'running') cleanup();
+        };
+
+        const unlock = () => {
+            ctx.resume()
+                .then(() => {
+                    if (ctx.state === 'running') cleanup();
+                })
+                .catch(() => {});
+        };
+
+        ctx.addEventListener('statechange', onStateChange);
+        document.addEventListener('pointerdown', unlock, { capture: true });
+        document.addEventListener('keydown', unlock, { capture: true });
+
+        return cleanup;
     }, [audioContext]);
 
     useEffect(() => {

@@ -359,17 +359,134 @@ const replacePlaylist: InternalControllerEndpoint['replacePlaylist'] = async ({
     return null;
 };
 
-const fileUrl = async (props: ClientProps, id: string, download = false) => {
-    const item = await metadata(props, id);
-    const part = item.Media?.[0]?.Part?.[0];
+let probeAudio: HTMLAudioElement | undefined;
+
+const BROWSER_CODEC_MIMES: Record<string, string[]> = {
+    aac: ['audio/mp4; codecs="mp4a.40.2"', 'audio/aac', 'audio/x-m4a'],
+    ac3: ['audio/mp4; codecs="ac-3"', 'audio/ac3'],
+    alac: ['audio/mp4; codecs="alac"'],
+    eac3: ['audio/mp4; codecs="ec-3"'],
+    flac: ['audio/flac', 'audio/x-flac'],
+    mp2: ['audio/mpeg'],
+    mp3: ['audio/mpeg'],
+    mp4a: ['audio/mp4; codecs="mp4a.40.2"'],
+    opus: ['audio/ogg; codecs="opus"', 'audio/webm; codecs="opus"'],
+    vorbis: ['audio/ogg; codecs="vorbis"', 'audio/webm; codecs="vorbis"'],
+};
+
+const UNSUPPORTED_BROWSER_CODECS = new Set([
+    'aiff',
+    'ape',
+    'dff',
+    'dsd',
+    'dsd_lsbf',
+    'dsd_msbf',
+    'dsf',
+    'dts',
+    'mlp',
+    'tak',
+    'truehd',
+    'wma',
+    'wmalossless',
+    'wmapro',
+    'wmav1',
+    'wmav2',
+    'wv',
+]);
+
+const canDirectPlayInBrowser = (media?: NonNullable<PlexMetadata['Media']>[number]): boolean => {
+    if (typeof Audio === 'undefined') return true;
+    const codec = media?.audioCodec?.toLowerCase();
+    const container = media?.container?.toLowerCase();
+    if (!codec && !container) return true;
+    if (container && ['aif', 'aiff', 'ape', 'dff', 'dsf', 'wma', 'wv'].includes(container)) {
+        return false;
+    }
+    if (codec && (UNSUPPORTED_BROWSER_CODECS.has(codec) || codec.startsWith('dsd'))) {
+        return false;
+    }
+    probeAudio ??= new Audio();
+    if (codec && (codec === 'wav' || codec.startsWith('pcm'))) {
+        return (
+            container !== 'aiff' &&
+            container !== 'aif' &&
+            !codec.endsWith('be') &&
+            probeAudio.canPlayType('audio/wav') !== ''
+        );
+    }
+    const mimes =
+        codec === 'flac' && (container === 'ogg' || container === 'oga')
+            ? ['audio/ogg; codecs="flac"', 'audio/flac']
+            : codec
+              ? BROWSER_CODEC_MIMES[codec]
+              : undefined;
+    if (!mimes) return true;
+    return mimes.some((mime) => probeAudio!.canPlayType(mime) !== '');
+};
+
+const plexAuthQueryParams = (credential: string): Record<string, string> =>
+    Object.fromEntries(
+        Object.entries(plexHeaders(credential)).filter(([key]) => key.startsWith('X-Plex-')),
+    );
+
+const directPartUrl = (props: ClientProps, partKey: string, download = false): string => {
     const base = getServerUrl(props.server, props.forceRemoteUrl);
-    if (!part?.key || !base) throw new Error('Plex track has no playable media');
-    const url = plexUrl(base, part.key);
+    if (!base) throw new Error('Plex server is required');
+    const url = plexUrl(base, partKey);
     // Media players cannot attach headers; use the same client identity as timeline reports.
-    for (const [key, value] of Object.entries(plexHeaders(requiredServer(props).credential))) {
-        if (key.startsWith('X-Plex-')) url.searchParams.set(key, value);
+    for (const [key, value] of Object.entries(
+        plexAuthQueryParams(requiredServer(props).credential),
+    )) {
+        url.searchParams.set(key, value);
     }
     if (download) url.searchParams.set('download', '1');
+    return url.toString();
+};
+
+const fileUrl = async (props: ClientProps, id: string, download = false) => {
+    const item = await metadata(props, id);
+    const part = item.Media?.find((media) => Boolean(media.Part?.[0]?.key))?.Part?.[0];
+    if (!part?.key) throw new Error('Plex track has no playable media');
+    return directPartUrl(props, part.key, download);
+};
+
+const transcodeUrl = (
+    props: ClientProps,
+    query: {
+        bitrate?: number;
+        format?: string;
+        id: string;
+        mediaIndex?: number;
+        startTime?: number;
+    },
+) => {
+    const base = getServerUrl(props.server, props.forceRemoteUrl);
+    if (!base) throw new Error('Plex server is required');
+    const codec = ['aac', 'flac', 'mp3', 'opus'].includes(query.format?.toLowerCase() ?? '')
+        ? query.format!.toLowerCase()
+        : 'mp3';
+    const ext = codec === 'aac' ? 'm4a' : codec;
+    const url = plexUrl(base, `/music/:/transcode/universal/start.${ext}`);
+    const authParams = plexAuthQueryParams(requiredServer(props).credential);
+    const bitrate = String(query.bitrate || 320);
+    const params: Record<string, string> = {
+        audioBitrate: bitrate,
+        audioCodec: codec,
+        directPlay: '0',
+        directStream: '0',
+        directStreamAudio: '0',
+        hasMDE: '1',
+        mediaIndex: String(query.mediaIndex ?? 0),
+        musicBitrate: bitrate,
+        offset: String(query.startTime ?? 0),
+        partIndex: '0',
+        path: `/library/metadata/${encodeURIComponent(query.id)}`,
+        protocol: 'http',
+        session: `${authParams['X-Plex-Client-Identifier']}-${query.id}-${codec}`,
+        'X-Plex-Platform': 'Web',
+        ...authParams,
+    };
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     return url.toString();
 };
 
@@ -894,28 +1011,26 @@ export const PlexController: InternalControllerEndpoint = {
     getSongListCount: async ({ apiClientProps, query }) =>
         (await songListWithGenreFallback(apiClientProps, { ...query, limit: 0 })).totalRecordCount,
     getStreamUrl: async ({ apiClientProps, query }) => {
-        if (!query.transcode) return fileUrl(apiClientProps, query.id);
-        const base = getServerUrl(apiClientProps.server, apiClientProps.forceRemoteUrl);
-        if (!base) throw new Error('Plex server is required');
-        const codec = ['aac', 'flac', 'mp3', 'opus'].includes(query.format?.toLowerCase() ?? '')
-            ? query.format!.toLowerCase()
-            : 'mp3';
-        const ext = codec === 'aac' ? 'm4a' : codec;
-        const url = plexUrl(base, `/music/:/transcode/universal/start.${ext}`);
-        const params = {
-            audioBitrate: String(query.bitrate || 320),
-            audioCodec: codec,
-            directPlay: '0',
-            directStream: '0',
-            mediaIndex: '0',
-            offset: String(query.startTime ?? 0),
-            partIndex: '0',
-            path: `/library/metadata/${encodeURIComponent(query.id)}`,
-            protocol: 'http',
-            ...plexHeaders(requiredServer(apiClientProps).credential),
-        };
-        for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-        return url.toString();
+        if (query.transcode) return transcodeUrl(apiClientProps, query);
+        const item = await metadata(apiClientProps, query.id);
+        const medias = item.Media ?? [];
+        const playableIndex = medias.findIndex((media) => Boolean(media.Part?.[0]?.key));
+        if (playableIndex < 0) throw new Error('Plex track has no playable media');
+
+        if (!query.skipAutoTranscode && !query.forRenderer && typeof Audio !== 'undefined') {
+            const directMedia = medias.find(
+                (media) => Boolean(media.Part?.[0]?.key) && canDirectPlayInBrowser(media),
+            );
+            if (directMedia?.Part?.[0]?.key) {
+                return directPartUrl(apiClientProps, directMedia.Part[0].key);
+            }
+            return transcodeUrl(apiClientProps, {
+                ...query,
+                mediaIndex: playableIndex,
+            });
+        }
+
+        return directPartUrl(apiClientProps, medias[playableIndex].Part![0].key);
     },
     getTopSongs: async ({ apiClientProps, query }) => {
         if (query.type !== 'personal') {

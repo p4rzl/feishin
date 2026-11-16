@@ -191,6 +191,64 @@ axios.defaults.adapter = async (config) => {
                 },
             ],
         };
+    else if (path === '/library/metadata/30')
+        container = {
+            Metadata: [
+                {
+                    ...track,
+                    Media: [
+                        {
+                            audioCodec: 'alac',
+                            bitrate: 900,
+                            container: 'mp4',
+                            Part: [
+                                {
+                                    file: '/music/song.m4a',
+                                    key: '/library/parts/300/file.m4a',
+                                    size: 123,
+                                },
+                            ],
+                        },
+                    ],
+                    ratingKey: '30',
+                },
+            ],
+        };
+    else if (path === '/library/metadata/31')
+        container = {
+            Metadata: [
+                {
+                    ...track,
+                    Media: [
+                        {
+                            audioCodec: 'alac',
+                            bitrate: 900,
+                            container: 'mp4',
+                            Part: [
+                                {
+                                    file: '/music/song.m4a',
+                                    key: '/library/parts/300/file.m4a',
+                                    size: 123,
+                                },
+                            ],
+                        },
+                        {
+                            audioCodec: 'mp3',
+                            bitrate: 320,
+                            container: 'mp3',
+                            Part: [
+                                {
+                                    file: '/music/song.mp3',
+                                    key: '/library/parts/301/file.mp3',
+                                    size: 90,
+                                },
+                            ],
+                        },
+                    ],
+                    ratingKey: '31',
+                },
+            ],
+        };
     else if (path === '/library/metadata/3/nearest')
         container = {
             Metadata: [{ ...track, ratingKey: '4', title: 'Sonic match' }],
@@ -354,7 +412,53 @@ const transcode = new URL(
 );
 assert.equal(transcode.pathname, '/proxy/music/:/transcode/universal/start.mp3');
 assert.equal(transcode.searchParams.get('audioBitrate'), '128');
+assert.equal(transcode.searchParams.get('musicBitrate'), '128');
+assert.equal(transcode.searchParams.get('hasMDE'), '1');
+assert.equal(transcode.searchParams.get('directStreamAudio'), '0');
+assert.equal(transcode.searchParams.get('session'), 'test-device-3-mp3');
+assert.equal(transcode.searchParams.get('X-Plex-Platform'), 'Web');
 assert.equal(transcode.searchParams.get('X-Plex-Client-Identifier'), 'test-device');
+assert.equal(transcode.searchParams.has('Accept'), false);
+
+// Browser codec probing must auto-transcode unsupported formats (e.g. ALAC in Firefox/Chrome)
+// while choosing playable alternate Media versions or direct play when supported or skipped.
+const previousAudio = globalThis.Audio;
+globalThis.Audio = function MockAudio() {
+    return {
+        canPlayType: (mime) => {
+            if (mime.includes('alac')) return '';
+            if (mime.includes('flac') || mime.includes('mpeg')) return 'probably';
+            return '';
+        },
+    };
+};
+try {
+    const flacBrowser = new URL(
+        await api.getStreamUrl({ apiClientProps, query: { id: '3', transcode: false } }),
+    );
+    assert.equal(flacBrowser.pathname, '/proxy/library/parts/30/file.flac');
+
+    const alacBrowser = new URL(
+        await api.getStreamUrl({ apiClientProps, query: { id: '30', transcode: false } }),
+    );
+    assert.equal(alacBrowser.pathname, '/proxy/music/:/transcode/universal/start.mp3');
+    assert.equal(alacBrowser.searchParams.get('path'), '/library/metadata/30');
+
+    const alacMpv = new URL(
+        await api.getStreamUrl({
+            apiClientProps,
+            query: { id: '30', skipAutoTranscode: true, transcode: false },
+        }),
+    );
+    assert.equal(alacMpv.pathname, '/proxy/library/parts/300/file.m4a');
+
+    const multiMedia = new URL(
+        await api.getStreamUrl({ apiClientProps, query: { id: '31', transcode: false } }),
+    );
+    assert.equal(multiMedia.pathname, '/proxy/library/parts/301/file.mp3');
+} finally {
+    globalThis.Audio = previousAudio;
+}
 assert.equal(
     new URL(await api.getDownloadUrl({ apiClientProps, query: { id: '3' } })).searchParams.get(
         'download',
