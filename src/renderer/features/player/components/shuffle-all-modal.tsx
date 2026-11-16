@@ -52,7 +52,7 @@ const useShuffleAllStore = createWithEqualityFn<ShuffleAllSlice>()(
             },
             enableMaxYear: false,
             enableMinYear: false,
-            genre: '',
+            genre: undefined,
             limit: 100,
             maxYear: 2020,
             minYear: 2000,
@@ -67,14 +67,15 @@ const useShuffleAllStore = createWithEqualityFn<ShuffleAllSlice>()(
                     return persisted;
                 }
 
-                if (version >= 2) {
-                    return persisted;
+                // v3: genre changed from a server-specific string to { id, name }
+                if (version < 3 && typeof (persisted as ShuffleAllSlice).genre === 'string') {
+                    (persisted as ShuffleAllSlice).genre = undefined;
                 }
 
                 return persisted;
             },
             name: 'store_shuffle_all',
-            version: 2,
+            version: 3,
         },
     ),
 );
@@ -109,7 +110,7 @@ export const ShuffleAllContextModal = () => {
     const { isFetching: isFetchingSongs, refetch: refetchSongs } = useQuery({
         ...randomFetchQuery({
             query: {
-                genre: genre || undefined,
+                genre,
                 limit: limit || 100,
                 maxYear: enableMaxYear ? maxYear || undefined : undefined,
                 minYear: enableMinYear ? minYear || undefined : undefined,
@@ -126,8 +127,12 @@ export const ShuffleAllContextModal = () => {
     const { isFetching: isFetchingAlbums, refetch: refetchAlbums } = useQuery({
         ...shuffleAlbumListQuery({
             query: {
-                genreIds: genre ? [genre] : undefined,
+                genreIds: genre ? [genre.id] : undefined,
                 limit: clampedLimit,
+                maxYear:
+                    server?.type === ServerType.PLEX && enableMaxYear
+                        ? maxYear || undefined
+                        : undefined,
                 minYear: enableMinYear ? minYear || undefined : undefined,
                 musicFolderId: musicFolderId || undefined,
                 sortBy: AlbumListSort.RANDOM,
@@ -216,7 +221,7 @@ export const ShuffleAllContextModal = () => {
                     value={minYear}
                 />
                 <NumberInput
-                    disabled={playbackKind === 'albums'}
+                    disabled={playbackKind === 'albums' && server?.type !== ServerType.PLEX}
                     label={t('form.shuffleAll.input_maxYear')}
                     max={2050}
                     min={1850}
@@ -224,7 +229,7 @@ export const ShuffleAllContextModal = () => {
                     rightSection={
                         <Checkbox
                             checked={enableMaxYear}
-                            disabled={playbackKind === 'albums'}
+                            disabled={playbackKind === 'albums' && server?.type !== ServerType.PLEX}
                             onChange={(e) => setStore({ enableMaxYear: e.currentTarget.checked })}
                             style={{ marginRight: '0.5rem' }}
                         />
@@ -235,34 +240,25 @@ export const ShuffleAllContextModal = () => {
             <Suspense fallback={<Select data={[]} />}>
                 <GenreSelect />
             </Suspense>
-            {server?.type === ServerType.JELLYFIN && playbackKind === 'songs' && (
-                <Select
-                    clearable
-                    data={PLAYED_DATA}
-                    label={t('form.shuffleAll.input_played')}
-                    onChange={(e) => {
-                        setStore({ played: e as Played });
-                    }}
-                    value={played}
-                />
-            )}
+            {(server?.type === ServerType.JELLYFIN || server?.type === ServerType.PLEX) &&
+                playbackKind === 'songs' && (
+                    <Select
+                        clearable
+                        data={PLAYED_DATA}
+                        label={t('form.shuffleAll.input_played')}
+                        onChange={(e) => {
+                            setStore({ played: e as Played });
+                        }}
+                        value={played}
+                    />
+                )}
             <Divider />
             <PlayButtonGroup loading={isFetchingSongs || isFetchingAlbums} onPlay={handlePlay} />
         </Stack>
     );
 };
 
-const randomFetchQuery = (args: {
-    query: {
-        genre?: string;
-        limit: number;
-        maxYear?: number;
-        minYear?: number;
-        musicFolderId?: string | string[];
-        played: Played;
-    };
-    serverId: string;
-}) => {
+const randomFetchQuery = (args: { query: RandomSongListQuery; serverId: string }) => {
     return queryOptions({
         queryFn: async ({ signal }) => {
             return api.controller.getRandomSongList({
@@ -292,34 +288,28 @@ export const openShuffleAllModal = async () => {
 
 const GenreSelect = () => {
     const { t } = useTranslation();
-    const server = useCurrentServer();
     const { genre } = useShuffleAllStore();
     const { data: genres } = useGenreList();
     const { setStore } = useShuffleAllStoreActions();
 
-    const genreData = useMemo(() => {
-        if (!genres) return [];
-
-        return genres.items.map((genre) => {
-            const value =
-                server?.type === ServerType.NAVIDROME || server?.type === ServerType.SUBSONIC
-                    ? genre.name
-                    : genre.id;
-            return {
-                label: genre.name,
-                value,
-            };
-        });
-    }, [genres, server.type]);
+    const genreData = useMemo(
+        () => genres?.items.map((genre) => ({ label: genre.name, value: genre.id })) ?? [],
+        [genres],
+    );
 
     return (
         <Select
             clearable
             data={genreData}
             label={t('form.shuffleAll.input_genre')}
-            onChange={(e) => setStore({ genre: e || '' })}
+            onChange={(id) => {
+                const selected = genres?.items.find((g) => g.id === id);
+                setStore({
+                    genre: selected ? { id: selected.id, name: selected.name } : undefined,
+                });
+            }}
             searchable
-            value={genre}
+            value={genre?.id ?? null}
         />
     );
 };

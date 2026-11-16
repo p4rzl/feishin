@@ -155,7 +155,8 @@ export const CreatePlaylistForm = ({ onCancel, songs }: CreatePlaylistFormProps)
                             required
                             {...form.getInputProps('name')}
                         />
-                        {server?.type === ServerType.NAVIDROME && (
+                        {(server?.type === ServerType.NAVIDROME ||
+                            server?.type === ServerType.PLEX) && (
                             <Textarea
                                 autosize
                                 label={t('form.createPlaylist.input', {

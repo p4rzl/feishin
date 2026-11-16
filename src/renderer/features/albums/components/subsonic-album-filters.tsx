@@ -10,7 +10,7 @@ import {
     ArtistMultiSelectRow,
     GenreMultiSelectRow,
 } from '/@/renderer/features/shared/components/multi-select-rows';
-import { useCurrentServerId } from '/@/renderer/store';
+import { useCurrentServer, useCurrentServerId } from '/@/renderer/store';
 import { useAppStore, useAppStoreActions } from '/@/renderer/store/app.store';
 import { Divider } from '/@/shared/components/divider/divider';
 import { Group } from '/@/shared/components/group/group';
@@ -25,6 +25,7 @@ import {
     AlbumArtistListSort,
     GenreListSort,
     LibraryItem,
+    ServerType,
     SortOrder,
 } from '/@/shared/types/domain-types';
 
@@ -39,7 +40,9 @@ export const SubsonicAlbumFilters = ({
 }: SubsonicAlbumFiltersProps) => {
     const { t } = useTranslation();
 
+    const server = useCurrentServer();
     const serverId = useCurrentServerId();
+    const isPlex = server?.type === ServerType.PLEX;
 
     const { query, setAlbumArtist, setFavorite, setGenreId, setMaxYear, setMinYear } =
         useAlbumListFilters();
@@ -85,10 +88,10 @@ export const SubsonicAlbumFilters = ({
     const hasGenre = query.genreIds && query.genreIds.length > 0;
     const hasYear = query.minYear !== undefined || query.maxYear !== undefined;
 
-    const isFavoriteDisabled = hasArtist || hasGenre || hasYear;
-    const isArtistDisabled = hasFavorite || hasGenre || hasYear;
-    const isGenreDisabled = hasFavorite || hasArtist || hasYear;
-    const isYearDisabled = hasFavorite || hasArtist || hasGenre;
+    const isFavoriteDisabled = !isPlex && (hasArtist || hasGenre || hasYear);
+    const isArtistDisabled = !isPlex && (hasFavorite || hasGenre || hasYear);
+    const isGenreDisabled = !isPlex && (hasFavorite || hasArtist || hasYear);
+    const isYearDisabled = !isPlex && (hasFavorite || hasArtist || hasGenre);
 
     const handleAlbumArtistFilter = useCallback(
         (e: null | string[]) => {
@@ -124,26 +127,57 @@ export const SubsonicAlbumFilters = ({
     }, [genreListQuery.data]);
 
     const selectedGenreIds = useMemo(() => query.genreIds || [], [query.genreIds]);
+    const genreSelectMode = useAppStore((state) => state.genreSelectMode);
+    const { setArtistSelectMode, setGenreSelectMode } = useAppStoreActions();
 
     const handleGenresFilter = useCallback(
         (e: null | string[]) => {
             if (isGenreDisabled && e !== null && e.length > 0) return; // Prevent setting if disabled
             if (e && e.length > 0) {
-                setGenreId([e[0]]);
+                setGenreId(isPlex ? e : [e[0]]);
             } else {
                 setGenreId(null);
             }
         },
-        [isGenreDisabled, setGenreId],
+        [isGenreDisabled, isPlex, setGenreId],
+    );
+
+    const handleGenreSelectModeChange = useCallback(
+        (value: string) => {
+            const newMode = value as 'multi' | 'single';
+            setGenreSelectMode(newMode);
+            if (newMode === 'single' && selectedGenreIds.length > 1) {
+                setGenreId([selectedGenreIds[0]]);
+            }
+        },
+        [selectedGenreIds, setGenreId, setGenreSelectMode],
     );
 
     const genreFilterLabel = useMemo(() => {
+        if (!isPlex) {
+            return (
+                <Text fw={500} size="sm">
+                    {t('entity.genre', { count: 1 })}
+                </Text>
+            );
+        }
         return (
-            <Text fw={500} size="sm">
-                {t('entity.genre', { count: 1 })}
-            </Text>
+            <Group gap="xs" justify="space-between" w="100%">
+                <Text fw={500} size="sm">
+                    {t('entity.genre', { count: 2 })}
+                </Text>
+                <SegmentedControl
+                    data={[
+                        { label: t('common.filter_single'), value: 'single' },
+                        { label: t('common.filter_multiple'), value: 'multi' },
+                    ]}
+                    onChange={handleGenreSelectModeChange}
+                    size="xs"
+                    value={genreSelectMode}
+                />
+            </Group>
         );
-    }, [t]);
+    }, [genreSelectMode, handleGenreSelectModeChange, isPlex, t]);
 
     const toggleFilters = useMemo(
         () => [
@@ -212,7 +246,6 @@ export const SubsonicAlbumFilters = ({
     const debouncedHandleMaxYearFilter = useDebouncedCallback(handleMaxYearFilter, 300);
 
     const artistSelectMode = useAppStore((state) => state.artistSelectMode);
-    const { setArtistSelectMode } = useAppStoreActions();
 
     const selectedArtistIds = useMemo(() => query.artistIds || [], [query.artistIds]);
 
@@ -295,7 +328,7 @@ export const SubsonicAlbumFilters = ({
                         onChange={handleGenresFilter}
                         options={genreList}
                         RowComponent={GenreMultiSelectRow}
-                        singleSelect={true}
+                        singleSelect={!isPlex || genreSelectMode === 'single'}
                         value={selectedGenreIds}
                     />
                 </>

@@ -6,6 +6,16 @@ import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+const memoryStorage = new Map();
+Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+        getItem: (key) => memoryStorage.get(key) ?? null,
+        removeItem: (key) => memoryStorage.delete(key),
+        setItem: (key, value) => memoryStorage.set(key, String(value)),
+    },
+});
+
 registerHooks({
     load(url, context, next) {
         if (!url.endsWith('.ts')) return next(url, context);
@@ -73,7 +83,10 @@ const track = {
                     file: '/music/song.flac',
                     key: '/library/parts/30/file.flac',
                     size: 123,
-                    Stream: [{ bitDepth: 24, samplingRate: 96000, streamType: 2 }],
+                    Stream: [
+                        { bitDepth: 24, samplingRate: 96000, streamType: 2 },
+                        { codec: 'lrc', key: '/library/streams/500', streamType: 4, timed: 1 },
+                    ],
                 },
             ],
         },
@@ -131,9 +144,73 @@ axios.defaults.adapter = async (config) => {
     else if (path === '/library/metadata/2')
         container = {
             Metadata: [
-                { key: '/library/metadata/2', ratingKey: '2', title: 'Album', type: 'album' },
+                {
+                    Format: [{ tag: 'EP' }],
+                    Genre: [{ id: '12', tag: 'Rock' }],
+                    Guid: [{ id: 'mbid://album-mbid-1' }],
+                    key: '/library/metadata/2',
+                    Mood: [{ tag: 'Energetic' }],
+                    parentRatingKey: '1',
+                    parentTitle: 'Album artist',
+                    ratingKey: '2',
+                    Subformat: [{ tag: 'Live' }],
+                    title: 'Album',
+                    type: 'album',
+                },
             ],
         };
+    else if (path === '/library/metadata/1')
+        container = {
+            Metadata: [
+                {
+                    childCount: 4,
+                    Genre: [{ id: '12', tag: 'Rock' }],
+                    Guid: [{ id: 'mbid://artist-mbid-1' }],
+                    key: '/library/metadata/1',
+                    leafCount: 32,
+                    PopularLeaves: config.params?.includePopularLeaves
+                        ? { Metadata: [{ ...track, ratingKey: '99', title: 'Popular song' }] }
+                        : undefined,
+                    ratingKey: '1',
+                    Similar: [{ tag: 'Related artist' }],
+                    summary: 'Artist bio',
+                    title: 'Album artist',
+                    type: 'artist',
+                },
+            ],
+        };
+    else if (path === '/library/metadata/1/similar')
+        container = {
+            Metadata: [
+                {
+                    key: '/library/metadata/11',
+                    ratingKey: '11',
+                    thumb: '/library/metadata/11/thumb/1',
+                    title: 'Related artist',
+                    type: 'artist',
+                },
+            ],
+        };
+    else if (path === '/library/metadata/3/nearest')
+        container = {
+            Metadata: [{ ...track, ratingKey: '4', title: 'Sonic match' }],
+        };
+    else if (path === '/library/sections/7/genre')
+        container = {
+            Directory: [
+                { count: 5, key: '12', title: 'Rock' },
+                { count: 2, key: '15', title: 'Jazz' },
+            ],
+        };
+    else if (path === '/library/streams/500') {
+        return {
+            config,
+            data: '[00:01.50]First line\n[00:05.00]Second line',
+            headers: {},
+            status: 200,
+            statusText: 'OK',
+        };
+    }
     else if (path === '/library/metadata/2/children')
         container = {
             Metadata: [track, { ...track, index: 1, parentIndex: 1, ratingKey: '4' }],
@@ -250,6 +327,12 @@ assert.equal(calls.at(-1).params['album.id'], '2');
 assert.equal(calls.at(-1).params.userRating, 10);
 assert.equal(calls.at(-1).params['X-Plex-Container-Start'], 1);
 assert.equal(new URL(calls.at(-1).url).pathname, '/proxy/library/sections/7/all');
+await api.getRandomSongList({
+    apiClientProps,
+    query: { genre: { id: '12', name: 'Rock' }, limit: 5 },
+});
+assert.equal(calls.at(-1).params.genre, '12');
+assert.equal(calls.at(-1).params.sort, 'random');
 
 const direct = new URL(
     await api.getStreamUrl({ apiClientProps, query: { id: '3', transcode: false } }),
@@ -526,6 +609,155 @@ await api.createFavorite({ apiClientProps, query: { id: ['3'], type: 'song' } })
 assert.equal(calls.at(-1).params.rating, 10);
 await api.deleteFavorite({ apiClientProps, query: { id: ['3'], type: 'song' } });
 assert.equal(calls.at(-1).params.rating, 0);
+
+// Rich metadata normalization: ReplayGain, MusicBrainz IDs, release types, moods and numeric flags.
+const richSong = plexNormalize.song(
+    plexMetadata.parse({
+        ...track,
+        Guid: [{ id: 'mbid://track-mbid-1' }],
+        Media: [
+            {
+                ...track.Media[0],
+                Part: [
+                    {
+                        ...track.Media[0].Part[0],
+                        Stream: [
+                            {
+                                albumGain: '-7.2',
+                                albumPeak: '0.99',
+                                bitDepth: 24,
+                                gain: '-5.5',
+                                peak: '0.95',
+                                samplingRate: 96000,
+                                streamType: 2,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        Mood: [{ tag: 'Chill' }],
+    }),
+    server,
+);
+assert.deepEqual(richSong.gain, { album: -7.2, track: -5.5 });
+assert.deepEqual(richSong.peak, { album: 0.99, track: 0.95 });
+assert.equal(richSong.mbzTrackId, 'mbid://track-mbid-1'.slice(7));
+assert.deepEqual(richSong.tags, { mood: ['Chill'] });
+assert.equal(album.releaseType, 'ep');
+assert.deepEqual(album.releaseTypes, ['ep', 'live']);
+assert.equal(album.mbzId, 'album-mbid-1');
+assert.deepEqual(album.tags, { mood: ['Energetic'] });
+assert.equal(album.songs[0].genres[0].name, 'Rock');
+const normalizedSmartPlaylist = plexNormalize.playlist(
+    plexMetadata.parse({ ...playlist, smart: 1 }),
+    server,
+);
+assert.deepEqual(normalizedSmartPlaylist.rules, {});
+
+// Genres, name-to-ID resolution, Auto DJ / radio / related artists / popular tracks / lyrics / radio stations.
+const genrePage = await api.getGenreList({
+    apiClientProps,
+    query: { sortBy: 'albumCount', sortOrder: 'DESC', startIndex: 0 },
+});
+assert.deepEqual(
+    genrePage.items.map((g) => [g.id, g.name, g.albumCount]),
+    [
+        ['12', 'Rock', 5],
+        ['15', 'Jazz', 2],
+    ],
+);
+await api.getSongList({
+    apiClientProps,
+    query: { genreIds: ['Rock'], limit: 1, sortBy: 'name', sortOrder: 'ASC', startIndex: 0 },
+});
+assert.equal(calls.at(-1).params.genre, '12');
+const similarSongs = await api.getSimilarSongs({
+    apiClientProps,
+    query: { count: 2, songId: '3' },
+});
+assert.ok(similarSongs.length >= 1 && similarSongs.every((entry) => entry.id !== '3'));
+assert.equal(similarSongs[0].id, '4');
+const artistRadio = await api.getArtistRadio({
+    apiClientProps,
+    query: { artistId: '1', count: 2 },
+});
+assert.equal(artistRadio[0].id, '3');
+const albumRadio = await api.getAlbumRadio({
+    apiClientProps,
+    query: { albumId: '2', count: 2 },
+});
+assert.equal(albumRadio[0].id, '3');
+const lyrics = await api.getLyrics({
+    apiClientProps,
+    query: { songId: '3' },
+});
+assert.deepEqual(lyrics, [
+    { startMs: 1500, text: 'First line' },
+    { startMs: 5000, text: 'Second line' },
+]);
+const artistInfo = await api.getAlbumArtistInfo({
+    apiClientProps,
+    query: { id: '1', limit: 5 },
+});
+assert.equal(artistInfo.biography, 'Artist bio');
+assert.equal(artistInfo.similarArtists[0].id, '11');
+assert.equal(artistInfo.similarArtists[0].name, 'Related artist');
+const topCommunity = await api.getTopSongs({
+    apiClientProps,
+    query: { artist: 'Album artist', artistId: '1', limit: 5, type: 'community' },
+});
+assert.equal(topCommunity.items[0].id, '99');
+const topPersonal = await api.getTopSongs({
+    apiClientProps,
+    query: { artist: 'Album artist', artistId: '1', limit: 5, type: 'personal' },
+});
+assert.equal(topPersonal.items[0].id, '3');
+const opusUrl = new URL(
+    await api.getStreamUrl({
+        apiClientProps,
+        query: { bitrate: 192, format: 'opus', id: '3', transcode: true },
+    }),
+);
+assert.equal(opusUrl.pathname, '/proxy/music/:/transcode/universal/start.opus');
+assert.equal(opusUrl.searchParams.get('audioCodec'), 'opus');
+await api.createPlaylist({
+    apiClientProps,
+    body: { comment: 'Curated mix', name: 'With description' },
+});
+assert.equal(calls.at(-1).params.summary, 'Curated mix');
+smart = true;
+await api.updatePlaylist({
+    apiClientProps,
+    body: { comment: 'Updated smart description', name: 'Smart renamed' },
+    query: { id: '9' },
+});
+assert.equal(calls.at(-1).params.title, 'Smart renamed');
+smart = false;
+const searchBefore = calls.length;
+const searchRes = await api.search({
+    apiClientProps,
+    query: { albumArtistLimit: 0, albumLimit: 0, query: 'Song', songLimit: 5 },
+});
+assert.equal(searchRes.albumArtists.length, 0);
+assert.equal(searchRes.albums.length, 0);
+assert.equal(searchRes.songs.length, 1);
+assert.equal(calls.length - searchBefore, 1);
+await api.createInternetRadioStation({
+    apiClientProps,
+    body: { homepageUrl: 'https://radio.example', name: 'Jazz FM', streamUrl: 'https://radio.example/stream' },
+});
+const stations = await api.getInternetRadioStations({ apiClientProps });
+assert.equal(stations.length, 1);
+assert.equal(stations[0].name, 'Jazz FM');
+await api.updateInternetRadioStation({
+    apiClientProps,
+    body: { homepageUrl: 'https://radio.example', name: 'Rock FM', streamUrl: 'https://radio.example/stream' },
+    query: { id: stations[0].id },
+});
+assert.equal((await api.getInternetRadioStations({ apiClientProps }))[0].name, 'Rock FM');
+await api.deleteInternetRadioStation({ apiClientProps, query: { id: stations[0].id } });
+assert.equal((await api.getInternetRadioStations({ apiClientProps })).length, 0);
 
 // Account-first discovery: the user never needs to enter a media-server endpoint.
 const oauthCalls = [];

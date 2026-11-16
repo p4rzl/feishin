@@ -205,20 +205,22 @@ export const PlaylistDetailSongListHeaderFilters = ({
             </Group>
             <Group gap="sm" wrap="nowrap">
                 {isViewEditMode &&
+                    (!isSmartPlaylist || detailQuery.data?._serverType === 'navidrome') &&
                     (isSmartPlaylist ? (
                         editActions
                     ) : (
                         <SaveAndReplaceButton mode={mode} songIds={tracks} />
                     ))}
-                {isViewEditMode && (
-                    <Button
-                        onClick={() => setMode?.(mode === 'edit' ? 'view' : 'edit')}
-                        uppercase
-                        variant={mode === 'edit' ? 'state-error' : 'subtle'}
-                    >
-                        {mode === 'edit' ? t('common.cancel') : t('common.edit')}
-                    </Button>
-                )}
+                {isViewEditMode &&
+                    (!isSmartPlaylist || detailQuery.data?._serverType === 'navidrome') && (
+                        <Button
+                            onClick={() => setMode?.(mode === 'edit' ? 'view' : 'edit')}
+                            uppercase
+                            variant={mode === 'edit' ? 'state-error' : 'subtle'}
+                        >
+                            {mode === 'edit' ? t('common.cancel') : t('common.edit')}
+                        </Button>
+                    )}
                 <Tooltip label={t(`common.${collapsed ? 'expand' : 'collapse'}`, {})}>
                     <ActionIcon
                         icon={collapsed ? 'arrowDownS' : 'arrowUpS'}

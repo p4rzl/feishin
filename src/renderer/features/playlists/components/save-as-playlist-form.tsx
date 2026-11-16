@@ -78,7 +78,7 @@ export const SaveAsPlaylistForm = ({
                     required
                     {...form.getInputProps('name')}
                 />
-                {server?.type === ServerType.NAVIDROME && (
+                {(server?.type === ServerType.NAVIDROME || server?.type === ServerType.PLEX) && (
                     <TextInput
                         label={t('form.createPlaylist.input', {
                             context: 'description',

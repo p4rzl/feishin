@@ -310,6 +310,8 @@ const plexFilters = (values: string[]) =>
             'recentlyAdded',
             'recentlyPlayed',
             'releaseDate',
+            'songCount',
+            'updatedAt',
             'year',
         ].includes(value)
             ? SortOrder.DESC
@@ -643,6 +645,7 @@ const SONG_LIST_FILTERS: Partial<
         'albumArtist',
         'duration',
         'year',
+        'releaseDate',
         'recentlyAdded',
         'recentlyPlayed',
         'playCount',
@@ -759,7 +762,14 @@ const ALBUM_ARTIST_LIST_FILTERS: Partial<
             value: AlbumArtistListSort.SONG_COUNT,
         },
     ],
-    [ServerType.PLEX]: plexFilters(['name', 'recentlyAdded', 'rating', 'random']),
+    [ServerType.PLEX]: plexFilters([
+        'name',
+        'recentlyAdded',
+        'recentlyPlayed',
+        'playCount',
+        'rating',
+        'random',
+    ]),
     [ServerType.SUBSONIC]: [
         {
             defaultOrder: SortOrder.DESC,
@@ -846,7 +856,14 @@ const ARTIST_LIST_FILTERS: Partial<
             value: ArtistListSort.SONG_COUNT,
         },
     ],
-    [ServerType.PLEX]: plexFilters(['name', 'recentlyAdded', 'rating', 'random']),
+    [ServerType.PLEX]: plexFilters([
+        'name',
+        'recentlyAdded',
+        'recentlyPlayed',
+        'playCount',
+        'rating',
+        'random',
+    ]),
     [ServerType.SUBSONIC]: [
         {
             defaultOrder: SortOrder.DESC,

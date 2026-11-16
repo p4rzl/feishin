@@ -198,7 +198,8 @@ const PlaylistDetailSongListRoute = () => {
     };
 
     const isSmartPlaylist = Boolean(
-        detailQuery?.data?.rules && server?.type === ServerType.NAVIDROME,
+        detailQuery?.data?.rules &&
+        (server?.type === ServerType.NAVIDROME || server?.type === ServerType.PLEX),
     );
 
     const playlistTarget = usePlaylistTarget();
@@ -240,7 +241,8 @@ const PlaylistDetailSongListRoute = () => {
         setIsSidebarOpen,
     ]);
 
-    const isEditingSmartPlaylist = isSmartPlaylist && mode === 'edit';
+    const isEditingSmartPlaylist =
+        isSmartPlaylist && server?.type === ServerType.NAVIDROME && mode === 'edit';
 
     const editActions = isEditingSmartPlaylist && (
         <>

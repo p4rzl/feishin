@@ -1,14 +1,19 @@
 import { z } from 'zod';
 
 const tag = z.object({ id: z.coerce.string().optional(), tag: z.string() });
+const plexBoolean = z.union([z.boolean(), z.number()]).transform(Boolean).optional();
 
-export const plexMetadata = z.object({
+const basePlexMetadata = z.object({
     addedAt: z.number().optional(),
+    childCount: z.number().optional(),
     composite: z.string().optional(),
+    Country: z.array(tag).optional(),
     duration: z.number().optional(),
+    Format: z.array(tag).optional(),
     Genre: z.array(tag).optional(),
     grandparentRatingKey: z.coerce.string().optional(),
     grandparentTitle: z.string().optional(),
+    Guid: z.array(z.object({ id: z.string() })).optional(),
     index: z.number().optional(),
     key: z.string(),
     lastViewedAt: z.number().optional(),
@@ -31,9 +36,17 @@ export const plexMetadata = z.object({
                             Stream: z
                                 .array(
                                     z.object({
+                                        albumGain: z.coerce.number().optional(),
+                                        albumPeak: z.coerce.number().optional(),
                                         bitDepth: z.number().optional(),
+                                        codec: z.string().optional(),
+                                        format: z.string().optional(),
+                                        gain: z.coerce.number().optional(),
+                                        key: z.string().optional(),
+                                        peak: z.coerce.number().optional(),
                                         samplingRate: z.number().optional(),
                                         streamType: z.number(),
+                                        timed: plexBoolean,
                                     }),
                                 )
                                 .optional(),
@@ -43,6 +56,7 @@ export const plexMetadata = z.object({
             }),
         )
         .optional(),
+    Mood: z.array(tag).optional(),
     originallyAvailableAt: z.string().optional(),
     originalTitle: z.string().optional(),
     parentIndex: z.number().optional(),
@@ -52,8 +66,11 @@ export const plexMetadata = z.object({
     playlistItemID: z.coerce.string().optional(),
     playlistType: z.string().optional(),
     ratingKey: z.coerce.string(),
-    smart: z.boolean().optional(),
+    Similar: z.array(tag).optional(),
+    smart: plexBoolean,
     studio: z.string().optional(),
+    Style: z.array(tag).optional(),
+    Subformat: z.array(tag).optional(),
     summary: z.string().optional(),
     thumb: z.string().optional(),
     thumbBlurHash: z.string().optional(),
@@ -66,13 +83,18 @@ export const plexMetadata = z.object({
     year: z.number().optional(),
 });
 
+export const plexMetadata = basePlexMetadata.extend({
+    PopularLeaves: z.object({ Metadata: z.array(basePlexMetadata).optional() }).optional(),
+});
+
 export const plexContainer = z.object({
     MediaContainer: z.object({
         Directory: z
             .array(
                 z.object({
+                    count: z.number().optional(),
                     key: z.coerce.string(),
-                    refreshing: z.boolean().optional(),
+                    refreshing: plexBoolean,
                     title: z.string(),
                     type: z.string().optional(),
                 }),

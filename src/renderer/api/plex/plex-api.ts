@@ -74,3 +74,17 @@ export const plexMutation = async (
         url: plexUrl(base, path).toString(),
     });
 };
+
+export const plexTextRequest = async (props: ClientProps, path: string): Promise<string> => {
+    const base = getServerUrl(props.server, props.forceRemoteUrl);
+    if (!base || !props.server?.credential) throw new Error('Plex server and token are required');
+    const response = await axios.request({
+        headers: { ...plexHeaders(props.server.credential), Accept: 'text/plain, */*' },
+        method: 'GET',
+        responseType: 'text',
+        signal: props.signal,
+        timeout: 30000,
+        url: plexUrl(base, path).toString(),
+    });
+    return typeof response.data === 'string' ? response.data : '';
+};

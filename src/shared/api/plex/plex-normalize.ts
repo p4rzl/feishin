@@ -45,12 +45,54 @@ const genres = (item: PlexMetadata, server: ServerListItem): Genre[] =>
         songCount: null,
     }));
 
+const mbzId = (item: PlexMetadata): null | string =>
+    item.Guid?.map((entry) => entry.id.match(/^mbid:\/\/(.+)$/)?.[1]).find(Boolean) ?? null;
+
+const tags = (item: PlexMetadata): null | Record<string, string[]> => {
+    const result: Record<string, string[]> = {};
+    if (item.Mood?.length) result.mood = item.Mood.map((entry) => entry.tag);
+    if (item.Style?.length) result.style = item.Style.map((entry) => entry.tag);
+    if (item.Country?.length) result.releasecountry = item.Country.map((entry) => entry.tag);
+    return Object.keys(result).length ? result : null;
+};
+
+const RELEASE_TYPE_MAP: Record<string, string> = {
+    album: 'album',
+    compilation: 'compilation',
+    demo: 'demo',
+    'dj-mix': 'dj-mix',
+    ep: 'ep',
+    live: 'live',
+    lp: 'album',
+    remix: 'remix',
+    single: 'single',
+    soundtrack: 'soundtrack',
+    spokenword: 'spokenword',
+};
+
+const releaseTypes = (item: PlexMetadata): string[] => [
+    ...new Set(
+        [...(item.Format ?? []), ...(item.Subformat ?? [])]
+            .map((entry) => entry.tag.trim().toLowerCase())
+            .map((tag) => RELEASE_TYPE_MAP[tag] ?? tag)
+            .filter(Boolean),
+    ),
+];
+
 const song = (item: PlexMetadata, server: ServerListItem): Song => {
     const media = item.Media?.[0];
     const part = media?.Part?.[0];
     const audio = part?.Stream?.find((stream) => stream.streamType === 2);
     const artists = relatedArtist(item.grandparentRatingKey, item.grandparentTitle);
     const releaseDate = item.originallyAvailableAt ?? (item.year ? String(item.year) : null);
+    const gain =
+        audio?.gain !== undefined || audio?.albumGain !== undefined
+            ? { album: audio.albumGain, track: audio.gain }
+            : null;
+    const peak =
+        audio?.peak !== undefined || audio?.albumPeak !== undefined
+            ? { album: audio.albumPeak, track: audio.peak }
+            : null;
     return {
         ...common(item, server),
         _itemType: LibraryItem.SONG,
@@ -75,7 +117,7 @@ const song = (item: PlexMetadata, server: ServerListItem): Song => {
         duration: item.duration ?? 0,
         explicitStatus: null,
         folderId: null,
-        gain: null,
+        gain,
         genres: genres(item, server),
         lastPlayedAt: item.lastViewedAt ? date(item.lastViewedAt) : null,
         libraryId: item.librarySectionID ?? null,
@@ -85,13 +127,13 @@ const song = (item: PlexMetadata, server: ServerListItem): Song => {
         mbzAlbumType: null,
         mbzRecordingId: null,
         mbzReleaseGroupId: null,
-        mbzTrackId: null,
+        mbzTrackId: mbzId(item),
         missing: null,
         originalDate: releaseDate,
         originalYear: item.year ?? null,
         participants: null,
         path: part?.file ?? null,
-        peak: null,
+        peak,
         playCount: item.viewCount ?? 0,
         playlistItemId: item.playlistItemID,
         releaseDate,
@@ -99,7 +141,7 @@ const song = (item: PlexMetadata, server: ServerListItem): Song => {
         sampleRate: audio?.samplingRate ?? null,
         size: part?.size ?? 0,
         sortName: item.titleSort ?? item.title,
-        tags: null,
+        tags: tags(item),
         trackNumber: item.index ?? 0,
         trackSubtitle: null,
         updatedAt: date(item.updatedAt),
@@ -107,59 +149,71 @@ const song = (item: PlexMetadata, server: ServerListItem): Song => {
     };
 };
 
-const album = (item: PlexMetadata, server: ServerListItem): Album => ({
-    ...common(item, server),
-    _itemType: LibraryItem.ALBUM,
-    albumArtistName: item.parentTitle ?? '',
-    albumArtists: relatedArtist(item.parentRatingKey, item.parentTitle),
-    artists: relatedArtist(item.parentRatingKey, item.parentTitle),
-    comment: item.summary ?? null,
-    createdAt: date(item.addedAt),
-    discs: null,
-    duration: item.duration ?? null,
-    explicitStatus: null,
-    gain: null,
-    genres: genres(item, server),
-    isCompilation: null,
-    lastPlayedAt: item.lastViewedAt ? date(item.lastViewedAt) : null,
-    mbzId: null,
-    mbzReleaseGroupId: null,
-    missing: null,
-    originalDate: item.originallyAvailableAt ?? null,
-    originalYear: item.year ?? null,
-    participants: null,
-    peak: null,
-    playCount: item.viewCount ?? null,
-    ratedAt: null,
-    recordLabels: item.studio ? [item.studio] : [],
-    releaseDate: item.originallyAvailableAt ?? null,
-    releaseType: null,
-    releaseTypes: [],
-    releaseYear: item.year ?? null,
-    size: null,
-    songCount: item.leafCount ?? null,
-    sortName: item.titleSort ?? item.title,
-    starredAt: null,
-    tags: null,
-    trackYearRange: null,
-    updatedAt: date(item.updatedAt),
-    version: null,
-});
+const album = (item: PlexMetadata, server: ServerListItem): Album => {
+    const types = releaseTypes(item);
+    return {
+        ...common(item, server),
+        _itemType: LibraryItem.ALBUM,
+        albumArtistName: item.parentTitle ?? '',
+        albumArtists: relatedArtist(item.parentRatingKey, item.parentTitle),
+        artists: relatedArtist(item.parentRatingKey, item.parentTitle),
+        comment: item.summary ?? null,
+        createdAt: date(item.addedAt),
+        discs: null,
+        duration: item.duration ?? null,
+        explicitStatus: null,
+        gain: null,
+        genres: genres(item, server),
+        isCompilation: types.includes('compilation') ? true : null,
+        lastPlayedAt: item.lastViewedAt ? date(item.lastViewedAt) : null,
+        mbzId: mbzId(item),
+        mbzReleaseGroupId: null,
+        missing: null,
+        originalDate: item.originallyAvailableAt ?? null,
+        originalYear: item.year ?? null,
+        participants: null,
+        peak: null,
+        playCount: item.viewCount ?? null,
+        ratedAt: null,
+        recordLabels: item.studio ? [item.studio] : [],
+        releaseDate: item.originallyAvailableAt ?? null,
+        releaseType: types[0] ?? null,
+        releaseTypes: types,
+        releaseYear: item.year ?? null,
+        size: null,
+        songCount: item.leafCount ?? null,
+        sortName: item.titleSort ?? item.title,
+        starredAt: null,
+        tags: tags(item),
+        trackYearRange: null,
+        updatedAt: date(item.updatedAt),
+        version: null,
+    };
+};
 
 const artist = (item: PlexMetadata, server: ServerListItem): AlbumArtist => ({
     ...common(item, server),
     _itemType: LibraryItem.ALBUM_ARTIST,
-    albumCount: null,
+    albumCount: item.childCount ?? null,
     biography: item.summary ?? null,
     duration: null,
     genres: genres(item, server),
     lastPlayedAt: item.lastViewedAt ? date(item.lastViewedAt) : null,
-    mbz: null,
+    mbz: mbzId(item),
     missing: null,
     playCount: item.viewCount ?? null,
     ratedAt: null,
-    similarArtists: null,
-    songCount: null,
+    similarArtists: item.Similar?.length
+        ? item.Similar.map((entry) => ({
+              id: entry.id ?? entry.tag,
+              imageId: null,
+              imageUrl: null,
+              name: entry.tag,
+              userFavorite: false,
+              userRating: null,
+          }))
+        : null,
+    songCount: item.leafCount ?? null,
     starredAt: null,
 });
 

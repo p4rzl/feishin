@@ -38,10 +38,14 @@ environment:
 
 ## Supported
 
-- Artists, albums (including all discs and tracks), songs, genres, search and library selection.
-- Server-side pagination, sorting and basic artist, album, genre, favorite and year filters.
-- Authenticated artwork, original-file streaming and downloads, and MP3 transcoding at the selected bitrate.
-- Music playlist browsing, creation, renaming, deletion, adding, removing and moving individual occurrences of a track.
+- Artists, albums (including release types such as Album/EP/Single/Live/Compilation, all discs and tracks), songs, genres, search and multi-library selection.
+- Server-side pagination, sorting and combinable artist, album, multi-genre, favorite, rated/unrated, played/unplayed and year range filters.
+- Genre resolution by ID and tag name, with automatic album-genre fallback when tracks do not carry duplicate track-level genre tags.
+- Auto DJ (both Similar and Library Random strategies), Track Radio, Artist Radio, Album Radio, Related Artists and Popular Tracks (`PopularLeaves` for community top songs and play-count sorting for personal top songs), using Plex Sonic Analysis (`/nearest`) when available and falling back to genre/artist similarity.
+- Authenticated artwork, ReplayGain normalization (`gain`/`peak`), original-file streaming and downloads, and transcoding (`mp3`, `aac`, `opus`, `flac`) at the selected bitrate.
+- Synchronized (LRC) and plain-text server-side lyrics streams (`/library/streams/...`), with automatic fallback to external lyric providers.
+- Local Internet Radio station management per Plex server.
+- Music playlist browsing, creation (including descriptions), renaming, description editing, deletion, adding, removing and moving individual occurrences of a track. Smart playlists display their badge and can be renamed or organized into sidebar folders while protecting their rules from manual track edits.
 - Saving a reordered playlist moves existing occurrences instead of replacing them, preserving duplicates and playlist entry IDs. An unchanged order requires no writes.
 - Ratings and play-count submissions. Plex has no separate favorite flag: a five-star rating is shown as a favorite. Adding a favorite sets five stars; removing it clears the rating.
 - Listening activity in Plex's dashboard: playback start, pause, resume, seek and stop, with timeline updates every ten seconds while playing or paused. Reporting follows Feishin's scrobbling setting and private mode; disabling reporting closes the public session. Play-count submissions remain separate from timeline updates.
@@ -49,9 +53,9 @@ environment:
 ## Limitations
 
 - No managed-user switching. Sign in with an account that has access to the library, or supply the appropriate user's token directly.
-- Smart playlists can be played, but cannot be edited through the ordinary playlist editor.
-- No Plex server queue synchronization, folder browsing, Internet radio storage or recommendation mixes. Local playback queues and external lyric providers continue to work.
-- Transcoding currently produces MP3, regardless of the selected codec. Original playback requires a codec supported by the chosen player. Plex's own permissions and subscription requirements still apply.
+- Smart playlists can be played and renamed, but their rules cannot be edited through the ordinary playlist editor.
+- No Plex server queue synchronization or filesystem folder browsing. Local playback queues and external lyric providers continue to work.
+- Original playback requires a codec supported by the chosen player. Plex's own permissions and subscription requirements (such as Plex Pass for Sonic Analysis) still apply.
 - Playlist replacement is not atomic: new tracks are appended before old entries are removed. If a request fails, duplicates can remain, but existing tracks are not erased before the additions succeed.
 - Playlist reordering is also not atomic: if a move fails, the order may be partially updated, but no tracks are added or removed. Missing playlist entry IDs are rejected before replacement or reordering starts.
 
