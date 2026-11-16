@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { defineConfig, normalizePath } from 'vite';
 import { ViteEjsPlugin } from 'vite-plugin-ejs';
@@ -5,6 +6,18 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 import { kuromojiDictionaryPlugin } from './vite.kuromoji-plugin';
 import { createReactPlugin } from './vite.react-plugin';
+
+const settingsTemplatePlugin = () => ({
+    closeBundle() {
+        const template = fs.readFileSync(path.resolve(__dirname, './settings.js.template'), 'utf8');
+        const rendered = template.replace(/\$\{([A-Z0-9_]+)\}/g, (_, key: string) => {
+            const val = process.env[key] ?? (key === 'SERVER_LOCK' ? 'false' : '');
+            return JSON.stringify(val).slice(1, -1);
+        });
+        fs.writeFileSync(path.resolve(__dirname, './out/web/settings.js'), rendered);
+    },
+    name: 'feishin-settings-template',
+});
 
 export default defineConfig({
     base: './',
@@ -67,6 +80,7 @@ export default defineConfig({
     plugins: [
         createReactPlugin(),
         kuromojiDictionaryPlugin(),
+        settingsTemplatePlugin(),
         ViteEjsPlugin({
             root: normalizePath(path.resolve(__dirname, './src/renderer')),
             web: true,

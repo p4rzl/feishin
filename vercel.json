@@ -1,0 +1,6 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "buildCommand": "pnpm run build:web",
+    "installCommand": "pnpm install --ignore-scripts",
+    "outputDirectory": "out/web"
+}
