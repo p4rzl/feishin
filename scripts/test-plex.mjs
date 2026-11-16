@@ -268,8 +268,7 @@ axios.defaults.adapter = async (config) => {
             status: 200,
             statusText: 'OK',
         };
-    }
-    else if (path === '/library/metadata/2/children')
+    } else if (path === '/library/metadata/2/children')
         container = {
             Metadata: [track, { ...track, index: 1, parentIndex: 1, ratingKey: '4' }],
             size: 2,
@@ -849,14 +848,22 @@ assert.equal(searchRes.songs.length, 1);
 assert.equal(calls.length - searchBefore, 1);
 await api.createInternetRadioStation({
     apiClientProps,
-    body: { homepageUrl: 'https://radio.example', name: 'Jazz FM', streamUrl: 'https://radio.example/stream' },
+    body: {
+        homepageUrl: 'https://radio.example',
+        name: 'Jazz FM',
+        streamUrl: 'https://radio.example/stream',
+    },
 });
 const stations = await api.getInternetRadioStations({ apiClientProps });
 assert.equal(stations.length, 1);
 assert.equal(stations[0].name, 'Jazz FM');
 await api.updateInternetRadioStation({
     apiClientProps,
-    body: { homepageUrl: 'https://radio.example', name: 'Rock FM', streamUrl: 'https://radio.example/stream' },
+    body: {
+        homepageUrl: 'https://radio.example',
+        name: 'Rock FM',
+        streamUrl: 'https://radio.example/stream',
+    },
     query: { id: stations[0].id },
 });
 assert.equal((await api.getInternetRadioStations({ apiClientProps }))[0].name, 'Rock FM');
@@ -1060,7 +1067,9 @@ const plexDirectConnected = await api.authenticate('', {
 });
 assert.equal(plexDirectConnected.url, plexDirectUrl);
 assert.ok(
-    !oauthCalls.slice(plexDirectStart).some((call) => new URL(call.url).pathname.endsWith('/identity')),
+    !oauthCalls
+        .slice(plexDirectStart)
+        .some((call) => new URL(call.url).pathname.endsWith('/identity')),
     'Skip unauthenticated /identity on *.plex.direct because Plex returns app.plex.tv CORS on unauthenticated routes',
 );
 const shared = await api.authenticate('', { ...connectArgs, server: oauthAccount.servers[1] });
